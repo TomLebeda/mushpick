@@ -1,0 +1,13 @@
+[package]
+name = "bfs_cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+env_logger = "0.11.6"
+exitcode = "1.1.2"
+itertools = "0.14.0"
+log = "0.4.26"
+rand = { version = "0.9.0", features = ["alloc"] }
+rayon = "1.10.0"
