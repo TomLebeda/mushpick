@@ -2,6 +2,26 @@ use std::{fmt::Display, fs, path::PathBuf};
 
 use log::*;
 
+/// returns true if the cell on LEFT exists and is available (free, true), otherwise returns false
+pub fn test_left(cells: &[bool], pos: usize, size: usize) -> bool {
+    return pos % size != 0 && cells[pos - 1];
+}
+
+/// returns true if the cell on RIGHT exists and is available (free, true), otherwise returns false
+pub fn test_right(cells: &[bool], pos: usize, size: usize) -> bool {
+    return ((pos + 1) % size != 0) && cells[pos + 1];
+}
+
+/// returns true if the cell DOWN exists and is available (free, true), otherwise returns false
+pub fn test_down(cells: &[bool], pos: usize, size: usize) -> bool {
+    return pos < size * size - size && cells[pos + size];
+}
+
+/// returns true if the cell UP exists and is available (free, true), otherwise returns false
+pub fn test_up(cells: &[bool], pos: usize, size: usize) -> bool {
+    return pos >= size && cells[pos - size];
+}
+
 /// Helper function that will print out formatted matrix
 pub fn print_matrix(mat: &Vec<Vec<usize>>) {
     let max_item = mat
@@ -108,6 +128,23 @@ impl Field {
         }
         return buf;
     }
+}
+
+/// print a maze, without players or mushrooms
+pub fn print_maze(maze: &[bool], size: usize) {
+    let outer_wall = String::from("██");
+    let wall = String::from("▒▒");
+    let path = String::from("  ");
+    println!("{}", outer_wall.repeat(size + 2));
+    for r in 0..size {
+        print!("{}", outer_wall);
+        for c in 0..size {
+            let cell = maze[r * size + c];
+            print!("{}", if cell { &path } else { &wall });
+        }
+        println!("{}", outer_wall);
+    }
+    println!("{}", outer_wall.repeat(size + 2));
 }
 
 /// General structure that represents named [X,Y] value

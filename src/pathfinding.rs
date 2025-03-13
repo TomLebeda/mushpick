@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::{Coord, Field};
+use crate::{Coord, Field, test_down, test_left, test_right, test_up};
 
 /// Find a shortest path using parallelized BFS algorithm
 pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Coord) -> Vec<Coord> {
@@ -29,28 +29,28 @@ pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Co
             .flat_map(|n: &Node| -> Vec<Node> {
                 let mut new_nodes = Vec::<Node>::with_capacity(4);
                 // test move RIGHT
-                if ((n.coord + 1) % field_size != 0) && cells[n.coord + 1] {
+                if test_right(&cells, n.coord, field_size) {
                     new_nodes.push(Node {
                         coord: n.coord + 1,
                         prev_coord: Some(n.coord),
                     });
                 }
                 // test move DOWN
-                if n.coord < field_size * field_size - field_size && cells[n.coord + field_size] {
+                if test_down(&cells, n.coord, field_size) {
                     new_nodes.push(Node {
                         coord: n.coord + field_size,
                         prev_coord: Some(n.coord),
                     })
                 }
                 // test move LEFT
-                if n.coord % field_size != 0 && cells[n.coord - 1] {
+                if test_left(&cells, n.coord, field_size) {
                     new_nodes.push(Node {
                         coord: n.coord - 1,
                         prev_coord: Some(n.coord),
                     })
                 }
                 // test move UP
-                if n.coord >= field_size && cells[n.coord - field_size] {
+                if test_up(&cells, n.coord, field_size) {
                     new_nodes.push(Node {
                         coord: n.coord - field_size,
                         prev_coord: Some(n.coord),
@@ -119,19 +119,19 @@ pub fn find_min_path_dist(
             .flat_map(|n: &usize| -> Vec<usize> {
                 let mut new_nodes = Vec::<usize>::with_capacity(4);
                 // test move RIGHT
-                if ((n + 1) % field_size != 0) && cells[n + 1] {
+                if test_right(&cells, *n, field_size) {
                     new_nodes.push(n + 1);
                 }
                 // test move DOWN
-                if *n < field_size * field_size - field_size && cells[n + field_size] {
+                if test_down(&cells, *n, field_size) {
                     new_nodes.push(n + field_size)
                 }
                 // test move LEFT
-                if n % field_size != 0 && cells[n - 1] {
+                if test_left(&cells, *n, field_size) {
                     new_nodes.push(n - 1)
                 }
                 // test move UP
-                if *n >= field_size && cells[n - field_size] {
+                if test_up(&cells, *n, field_size) {
                     new_nodes.push(n - field_size)
                 }
                 return new_nodes;
@@ -219,19 +219,19 @@ pub fn is_field_accessible(cells: &[bool], size: usize) -> bool {
             .flat_map(|n: &usize| -> Vec<usize> {
                 let mut new_nodes = Vec::<usize>::with_capacity(4);
                 // test move RIGHT
-                if ((n + 1) % field_size != 0) && cells[n + 1] {
+                if test_right(&cells, *n, field_size) {
                     new_nodes.push(n + 1);
                 }
                 // test move DOWN
-                if *n < field_size * field_size - field_size && cells[n + field_size] {
+                if test_down(&cells, *n, field_size) {
                     new_nodes.push(n + field_size)
                 }
                 // test move LEFT
-                if n % field_size != 0 && cells[n - 1] {
+                if test_left(&cells, *n, field_size) {
                     new_nodes.push(n - 1)
                 }
                 // test move UP
-                if *n >= field_size && cells[n - field_size] {
+                if test_up(&cells, *n, field_size) {
                     new_nodes.push(n - field_size)
                 }
                 return new_nodes;
