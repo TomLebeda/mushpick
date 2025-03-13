@@ -22,22 +22,6 @@ pub fn test_up(cells: &[bool], pos: usize, size: usize) -> bool {
     return pos >= size && cells[pos - size];
 }
 
-/// Helper function that will print out formatted matrix
-pub fn print_matrix(mat: &Vec<Vec<usize>>) {
-    let max_item = mat
-        .iter()
-        .map(|row: &Vec<usize>| return row.iter().max().unwrap_or(&0))
-        .max()
-        .unwrap_or(&0);
-    let col_width = f32::log10(*max_item as f32).ceil() as usize + 2;
-    for row in mat {
-        for cell in row {
-            print!("{cell:col_width$}");
-        }
-        println!()
-    }
-}
-
 /// Loads a Field from given file
 pub fn parse_field(path: &PathBuf) -> Field {
     let Ok(contents) = fs::read_to_string(path) else {
@@ -96,55 +80,6 @@ pub struct Field {
     /// booleans representing the cells, where true means the player can step on that cell
     /// the shape is 2D matrix stored in a single vec, row-after-row
     pub cells: Vec<bool>,
-}
-
-impl Field {
-    /// render field into parsable ascii art
-    pub fn render(&self) -> String {
-        let mut buf = String::new();
-        let player_flat_idxs: Vec<usize> = self
-            .players
-            .iter()
-            .map(|c| return c.x + c.y * self.size)
-            .collect();
-        let mush_flat_idxs: Vec<usize> = self
-            .mushrooms
-            .iter()
-            .map(|c| return c.x + c.y * self.size)
-            .collect();
-        for (idx, free) in self.cells.iter().enumerate() {
-            if idx > 0 && idx % self.size == 0 {
-                buf += "\n"
-            }
-            if !free {
-                buf += "X ";
-            } else if player_flat_idxs.contains(&idx) {
-                buf += "P ";
-            } else if mush_flat_idxs.contains(&idx) {
-                buf += "M ";
-            } else {
-                buf += "- ";
-            }
-        }
-        return buf;
-    }
-}
-
-/// print a maze, without players or mushrooms
-pub fn print_maze(maze: &[bool], size: usize) {
-    let outer_wall = String::from("██");
-    let wall = String::from("▒▒");
-    let path = String::from("  ");
-    println!("{}", outer_wall.repeat(size + 2));
-    for r in 0..size {
-        print!("{}", outer_wall);
-        for c in 0..size {
-            let cell = maze[r * size + c];
-            print!("{}", if cell { &path } else { &wall });
-        }
-        println!("{}", outer_wall);
-    }
-    println!("{}", outer_wall.repeat(size + 2));
 }
 
 /// General structure that represents named [X,Y] value

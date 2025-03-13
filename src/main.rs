@@ -14,6 +14,8 @@ mod cli;
 mod generator;
 /// path-finding related functions
 mod pathfinding;
+/// functions related to rendering
+mod renderer;
 /// functions related to the solver itself
 mod solver;
 /// various utility functions and types
@@ -40,8 +42,25 @@ fn main() {
             players,
             mushrooms,
             walls,
+            pretty,
+            save,
         } => match generate_field(size, walls, players, mushrooms) {
-            Ok(field) => println!("{}", field.render()),
+            Ok(field) => {
+                let parsable = field.render_parsable();
+                if let Some(path) = save {
+                    if std::fs::write(&path, &parsable).is_err() {
+                        error!("can't write the output file {}", path.display());
+                        info!("here is the content, so you don't loose it:\n{}", &parsable);
+                    } else {
+                        info!("output written into {}", path.display());
+                    }
+                }
+                if pretty {
+                    println!("{}", field.render_pretty());
+                } else {
+                    println!("{}", parsable);
+                }
+            }
             Err(e) => error!("can not generate maze: {e}"),
         },
     };

@@ -34,14 +34,11 @@ pub enum Commands {
     #[clap(alias = "gen")]
     Generate {
         /// size of the map, value of N will produce N-by-N map
-        #[arg(long, short, alias = "n")]
+        #[arg(long, short = 'n')]
         size: usize,
 
-        /// number of walls placed randomly in the map
-        ///
-        /// If the walls happen to be placed in such a way that some areas are not accessible, the
-        /// attempt will be scrapped and new one will be generated.
-        #[arg(long, short, alias = "w")]
+        /// number of walls placed in the map
+        #[arg(long, short)]
         walls: usize,
 
         /// number of players placed randomly in the map
@@ -51,5 +48,13 @@ pub enum Commands {
         /// number of mushrooms placed randomly in the map
         #[arg(long, short)]
         mushrooms: usize,
+
+        /// if enabled, print pretty (non-parsable!) version into stdout
+        #[arg(long, short = 'P')]
+        pretty: bool,
+
+        /// save the maze (as parsable text) into given file instead of printing out, useful with --pretty
+        #[arg(long, short)]
+        save: Option<PathBuf>,
     },
 }
