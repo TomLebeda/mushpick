@@ -29,6 +29,9 @@ pub enum Commands {
     Solve {
         /// Path to the map file
         map: PathBuf,
+        /// if set, print out the result as an ascii-art
+        #[arg(long, short = 'P')]
+        pretty: bool,
     },
     /// Generate a new map that is guaranteed to be solvable
     #[clap(alias = "gen")]

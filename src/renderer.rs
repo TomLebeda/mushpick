@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::{Coord, Field};
 
 /// Helper function that will print out formatted matrix
@@ -18,15 +20,16 @@ pub fn print_matrix(mat: &Vec<Vec<usize>>) {
 
 impl Field {
     /// render field into pretty ascii art
-    pub fn render_pretty(&self) -> String {
-        let mut buf = String::new();
-        let outer_wall = String::from("█");
-        let wall = String::from("▒");
-        let path = String::from(" ");
-        let player = String::from("P");
-        let mush = String::from("*");
-        buf += &outer_wall.repeat(self.size + 2);
-        buf += "\n";
+    pub fn render_pretty(&self, paths: Option<&Vec<Vec<Coord>>>) -> String {
+        let mut buf: Vec<Vec<char>> = Vec::with_capacity(self.size);
+        let wall = '█';
+        //let path = '░';
+        let path = ' ';
+        let player = 'P';
+        let mush = '*';
+        let picked = 'o';
+        let stepped = '·';
+        let end = 'X';
         let player_pos_flattened: Vec<usize> = self
             .players
             .iter()
@@ -38,27 +41,45 @@ impl Field {
             .map(|p| return p.x + p.y * self.size)
             .collect();
         for r in 0..self.size {
-            buf += &outer_wall;
+            let mut row: Vec<char> = Vec::with_capacity(self.size);
             for c in 0..self.size {
                 let pos = r * self.size + c;
                 let cell = self.cells[pos];
                 if cell {
                     if player_pos_flattened.contains(&pos) {
-                        buf += &player;
+                        row.push(player);
                     } else if mushrooms_pos_flattened.contains(&pos) {
-                        buf += &mush;
+                        row.push(mush);
                     } else {
-                        buf += &path;
+                        row.push(path);
                     }
                 } else {
-                    buf += &wall;
+                    row.push(wall);
                 }
             }
-            buf += &outer_wall;
-            buf += "\n";
+            buf.push(row);
         }
-        buf += &outer_wall.repeat(self.size + 2);
-        return buf;
+        if let Some(paths) = paths {
+            for p in paths {
+                for (i, step) in p.iter().enumerate() {
+                    if i == 0 {
+                        // skip the first coord, since it is a player
+                        continue;
+                    }
+                    let cell = buf.get_mut(step.y).unwrap().get_mut(step.x).unwrap();
+                    if cell == &mush {
+                        *cell = picked;
+                    } else if cell == &path {
+                        *cell = stepped;
+                    };
+                }
+            }
+        }
+        return buf
+            .into_iter()
+            .map(|row| return row.into_iter().collect::<String>())
+            .collect::<Vec<String>>()
+            .join("\n");
     }
 
     /// render field into parsable ascii art

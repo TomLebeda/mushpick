@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Solve the map on provided file path
-pub fn solve(map: PathBuf) {
+pub fn solve(map: PathBuf, pretty: bool) {
     let field = parse_field(&map);
     match is_field_accessible(&field.cells, field.size) {
         true => info!("all cells are accessible"),
@@ -98,6 +98,10 @@ pub fn solve(map: PathBuf) {
             "- P{player}: {{{}}}",
             path.iter().map(|c| format!("{c}")).join(", ")
         );
+    }
+
+    if pretty {
+        println!("{}", field.render_pretty(Some(&paths)));
     }
 }
 

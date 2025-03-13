@@ -34,8 +34,8 @@ fn main() {
                 false => println!("ERR: flood-fill couldn't reach all cells"),
             }
         }
-        cli::Commands::Solve { map } => {
-            solve(map);
+        cli::Commands::Solve { map, pretty } => {
+            solve(map, pretty);
         }
         cli::Commands::Generate {
             size,
@@ -56,7 +56,7 @@ fn main() {
                     }
                 }
                 if pretty {
-                    println!("{}", field.render_pretty());
+                    println!("{}", field.render_pretty(None));
                 } else {
                     println!("{}", parsable);
                 }
