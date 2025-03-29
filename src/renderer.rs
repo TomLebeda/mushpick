@@ -113,7 +113,7 @@ pub fn render_tikz(map_file: PathBuf, solution_file: Option<PathBuf>, output_fil
         };
         for (_player, result) in results {
             buf += &format!(
-                r"\draw[ultra thick, red] {};",
+                r"\draw[very thick, red, rounded corners=0.2cm] {};",
                 result
                     .steps
                     .iter()
