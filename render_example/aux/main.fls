@@ -140,4 +140,5 @@ INPUT ./src/generated.tex
 INPUT /home/tom/.texlive/texmf-var/luatex-cache/generic/fonts/otl/lmroman8-regular.luc
 OUTPUT aux/main.pdf
 INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map
+INPUT ./src/big.tex
 INPUT ./aux/main.aux

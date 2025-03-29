@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.22.0 (TeX Live 2025/Arch Linux)  (format=lualatex 2025.3.25)  29 MAR 2025 12:41
+This is LuaHBTeX, Version 1.22.0 (TeX Live 2025/Arch Linux)  (format=lualatex 2025.3.25)  29 MAR 2025 12:57
  system commands enabled.
 **main.tex
 (./main.tex
@@ -309,7 +309,16 @@ File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 
 [1
 
-{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}] (./aux/main.aux)
+{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}] (./src/big.tex)
+Overfull \hbox (56.9503pt too wide) in paragraph at lines 137--17
+ [][] 
+ []
+
+
+
+[2
+
+] (./aux/main.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -317,19 +326,19 @@ L3 programming layer <2025-01-18>
 )
 
 Here is how much of LuaTeX's memory you used:
- 12033 strings out of 475506
+ 12043 strings out of 475506
  100000,794899 words of node,token memory allocated
  413 words of node memory still in use:
    3 hlist, 1 vlist, 1 rule, 2 glue, 3 kern, 1 glyph, 5 attribute, 48 glue_spec, 5 attribute_list, 2 write nodes
-   avail lists: 2:2638,3:1673,4:22,5:31,6:2,7:1242,9:374,10:1,11:10
- 34736 multiletter control sequences out of 65536+600000
+   avail lists: 2:4766,3:3207,4:28,5:31,6:2,7:1954,9:556,10:1,11:12
+ 34740 multiletter control sequences out of 65536+600000
  16 fonts using 855119 bytes
  102i,10n,101p,637b,946s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf-dist/fonts/opentype/public/lm/lmroman8-regular.otf></usr/share/texmf-dist/fonts/opentype/public/lm/lmroman12-regular.otf>
-Output written on main.pdf (1 page, 10523 bytes).
+Output written on main.pdf (2 pages, 16391 bytes).
 
-PDF statistics: 25 PDF objects out of 1000 (max. 8388607)
- 15 compressed objects within 1 object stream
+PDF statistics: 28 PDF objects out of 1000 (max. 8388607)
+ 17 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 131072)
  16 words of extra memory for PDF output out of 10000 (max. 100000000)
 

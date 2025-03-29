@@ -1,0 +1,137 @@
+\begin{tikzpicture}[scale=1,yscale=-1.0]
+\tikzset{
+        mush/.pic = {
+            \draw[rounded corners=0.08400001cm,fill=yellow!20!brown!20!white] (-0.08400001, 0) rectangle (0.08400001, 0.36);
+            \draw[fill=brown] (-0.24000001, 0.24000001) -- (0.24000001, 0.24000001)
+                arc(0:180:0.24000001) --cycle;
+        }
+    }
+\tikzset{
+        person/.pic = {
+            \draw[rounded corners=0.1cm,fill=blue!30]
+                (0,0.4) to[out=-10,in=100]
+                (0.3,0) to[bend left=15]
+                (-0.3,0) to[out=80,in=190]
+                (0,0.4);
+            \draw[fill=yellow] (0, 0.5) circle [radius=0.17];
+            \node[anchor=center] at (0, 0.15000000000000002) {\scriptsize P\tikzpictext};
+        }
+    }
+\draw[draw=none,fill=gray] (9,0) rectangle (10,1);
+\draw[draw=none,fill=gray] (10,0) rectangle (11,1);
+\draw[draw=none,fill=gray] (0,1) rectangle (1,2);
+\draw[draw=none,fill=gray] (2,1) rectangle (3,2);
+\draw[draw=none,fill=gray] (3,1) rectangle (4,2);
+\draw[draw=none,fill=gray] (6,1) rectangle (7,2);
+\draw[draw=none,fill=gray] (7,1) rectangle (8,2);
+\draw[draw=none,fill=gray] (12,1) rectangle (13,2);
+\draw[draw=none,fill=gray] (13,1) rectangle (14,2);
+\draw[draw=none,fill=gray] (4,2) rectangle (5,3);
+\draw[draw=none,fill=gray] (8,2) rectangle (9,3);
+\draw[draw=none,fill=gray] (10,2) rectangle (11,3);
+\draw[draw=none,fill=gray] (3,3) rectangle (4,4);
+\draw[draw=none,fill=gray] (7,3) rectangle (8,4);
+\draw[draw=none,fill=gray] (9,3) rectangle (10,4);
+\draw[draw=none,fill=gray] (14,3) rectangle (15,4);
+\draw[draw=none,fill=gray] (11,4) rectangle (12,5);
+\draw[draw=none,fill=gray] (13,4) rectangle (14,5);
+\draw[draw=none,fill=gray] (0,5) rectangle (1,6);
+\draw[draw=none,fill=gray] (2,5) rectangle (3,6);
+\draw[draw=none,fill=gray] (4,5) rectangle (5,6);
+\draw[draw=none,fill=gray] (5,5) rectangle (6,6);
+\draw[draw=none,fill=gray] (7,5) rectangle (8,6);
+\draw[draw=none,fill=gray] (8,5) rectangle (9,6);
+\draw[draw=none,fill=gray] (9,5) rectangle (10,6);
+\draw[draw=none,fill=gray] (10,5) rectangle (11,6);
+\draw[draw=none,fill=gray] (12,5) rectangle (13,6);
+\draw[draw=none,fill=gray] (2,6) rectangle (3,7);
+\draw[draw=none,fill=gray] (13,6) rectangle (14,7);
+\draw[draw=none,fill=gray] (2,7) rectangle (3,8);
+\draw[draw=none,fill=gray] (4,7) rectangle (5,8);
+\draw[draw=none,fill=gray] (6,7) rectangle (7,8);
+\draw[draw=none,fill=gray] (9,7) rectangle (10,8);
+\draw[draw=none,fill=gray] (13,7) rectangle (14,8);
+\draw[draw=none,fill=gray] (5,8) rectangle (6,9);
+\draw[draw=none,fill=gray] (11,8) rectangle (12,9);
+\draw[draw=none,fill=gray] (13,8) rectangle (14,9);
+\draw[draw=none,fill=gray] (1,9) rectangle (2,10);
+\draw[draw=none,fill=gray] (2,9) rectangle (3,10);
+\draw[draw=none,fill=gray] (3,9) rectangle (4,10);
+\draw[draw=none,fill=gray] (4,9) rectangle (5,10);
+\draw[draw=none,fill=gray] (7,9) rectangle (8,10);
+\draw[draw=none,fill=gray] (9,9) rectangle (10,10);
+\draw[draw=none,fill=gray] (10,9) rectangle (11,10);
+\draw[draw=none,fill=gray] (13,9) rectangle (14,10);
+\draw[draw=none,fill=gray] (1,10) rectangle (2,11);
+\draw[draw=none,fill=gray] (5,10) rectangle (6,11);
+\draw[draw=none,fill=gray] (7,10) rectangle (8,11);
+\draw[draw=none,fill=gray] (10,10) rectangle (11,11);
+\draw[draw=none,fill=gray] (12,10) rectangle (13,11);
+\draw[draw=none,fill=gray] (1,11) rectangle (2,12);
+\draw[draw=none,fill=gray] (3,11) rectangle (4,12);
+\draw[draw=none,fill=gray] (6,11) rectangle (7,12);
+\draw[draw=none,fill=gray] (7,11) rectangle (8,12);
+\draw[draw=none,fill=gray] (8,11) rectangle (9,12);
+\draw[draw=none,fill=gray] (10,11) rectangle (11,12);
+\draw[draw=none,fill=gray] (12,11) rectangle (13,12);
+\draw[draw=none,fill=gray] (13,11) rectangle (14,12);
+\draw[draw=none,fill=gray] (1,12) rectangle (2,13);
+\draw[draw=none,fill=gray] (4,12) rectangle (5,13);
+\draw[draw=none,fill=gray] (7,12) rectangle (8,13);
+\draw[draw=none,fill=gray] (10,12) rectangle (11,13);
+\draw[draw=none,fill=gray] (5,13) rectangle (6,14);
+\draw[draw=none,fill=gray] (7,13) rectangle (8,14);
+\draw[draw=none,fill=gray] (8,13) rectangle (9,14);
+\draw[draw=none,fill=gray] (12,13) rectangle (13,14);
+\draw[draw=none,fill=gray] (13,13) rectangle (14,14);
+\draw[draw=none,fill=gray] (0,14) rectangle (1,15);
+\draw[draw=none,fill=gray] (4,14) rectangle (5,15);
+\draw[draw=none,fill=gray] (10,14) rectangle (11,15);
+\draw (0,0) grid[step=1] (15,15);
+\node[anchor=south] at (0.5,0) {0};
+\node[anchor=east] at (0,0.5) {0};
+\node[anchor=south] at (1.5,0) {1};
+\node[anchor=east] at (0,1.5) {1};
+\node[anchor=south] at (2.5,0) {2};
+\node[anchor=east] at (0,2.5) {2};
+\node[anchor=south] at (3.5,0) {3};
+\node[anchor=east] at (0,3.5) {3};
+\node[anchor=south] at (4.5,0) {4};
+\node[anchor=east] at (0,4.5) {4};
+\node[anchor=south] at (5.5,0) {5};
+\node[anchor=east] at (0,5.5) {5};
+\node[anchor=south] at (6.5,0) {6};
+\node[anchor=east] at (0,6.5) {6};
+\node[anchor=south] at (7.5,0) {7};
+\node[anchor=east] at (0,7.5) {7};
+\node[anchor=south] at (8.5,0) {8};
+\node[anchor=east] at (0,8.5) {8};
+\node[anchor=south] at (9.5,0) {9};
+\node[anchor=east] at (0,9.5) {9};
+\node[anchor=south] at (10.5,0) {10};
+\node[anchor=east] at (0,10.5) {10};
+\node[anchor=south] at (11.5,0) {11};
+\node[anchor=east] at (0,11.5) {11};
+\node[anchor=south] at (12.5,0) {12};
+\node[anchor=east] at (0,12.5) {12};
+\node[anchor=south] at (13.5,0) {13};
+\node[anchor=east] at (0,13.5) {13};
+\node[anchor=south] at (14.5,0) {14};
+\node[anchor=east] at (0,14.5) {14};
+\draw[ultra thick, red] (0.5,0.5) -- (1.5,0.5) -- (1.5,1.5) -- (1.5,2.5) -- (1.5,3.5) -- (1.5,2.5) -- (1.5,1.5) -- (1.5,0.5) -- (2.5,0.5) -- (3.5,0.5) -- (4.5,0.5) -- (5.5,0.5) -- (6.5,0.5) -- (7.5,0.5) -- (8.5,0.5) -- (8.5,1.5) -- (9.5,1.5) -- (10.5,1.5) -- (11.5,1.5) -- (11.5,2.5) -- (11.5,3.5) -- (10.5,3.5) -- (10.5,4.5) -- (9.5,4.5) -- (8.5,4.5) -- (8.5,3.5);
+\draw[ultra thick, red] (6.5,4.5) -- (6.5,5.5) -- (6.5,6.5) -- (7.5,6.5) -- (8.5,6.5) -- (9.5,6.5) -- (8.5,6.5) -- (7.5,6.5) -- (6.5,6.5) -- (5.5,6.5) -- (4.5,6.5) -- (3.5,6.5) -- (3.5,5.5) -- (3.5,4.5) -- (2.5,4.5) -- (1.5,4.5) -- (1.5,5.5) -- (1.5,6.5) -- (1.5,7.5) -- (1.5,8.5) -- (0.5,8.5) -- (0.5,9.5) -- (0.5,10.5);
+\draw[ultra thick, red] (14.5,12.5) -- (13.5,12.5) -- (12.5,12.5) -- (11.5,12.5) -- (11.5,11.5) -- (11.5,12.5) -- (11.5,13.5) -- (10.5,13.5) -- (9.5,13.5) -- (9.5,14.5) -- (8.5,14.5) -- (7.5,14.5) -- (6.5,14.5) -- (6.5,13.5) -- (6.5,12.5) -- (5.5,12.5) -- (5.5,11.5) -- (4.5,11.5) -- (4.5,10.5) -- (3.5,10.5) -- (2.5,10.5) -- (2.5,11.5) -- (2.5,12.5) -- (2.5,13.5) -- (2.5,14.5) -- (1.5,14.5);
+\pic at (6.5,0.79) {mush};
+\pic at (11.5,2.79) {mush};
+\pic at (1.5,3.79) {mush};
+\pic at (8.5,3.79) {mush};
+\pic at (1.5,4.79) {mush};
+\pic at (9.5,6.79) {mush};
+\pic at (0.5,10.79) {mush};
+\pic at (11.5,11.79) {mush};
+\pic at (5.5,12.79) {mush};
+\pic at (1.5,14.79) {mush};
+\pic[pic text={0}] at (0.5,0.8) {person};
+\pic[pic text={1}] at (6.5,4.8) {person};
+\pic[pic text={2}] at (14.5,12.8) {person};
+\end{tikzpicture}
