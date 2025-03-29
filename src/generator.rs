@@ -4,9 +4,7 @@ use rand::{
     seq::{IndexedRandom, SliceRandom},
 };
 
-use crate::{
-    Coord, Field, pathfinding::is_field_accessible, test_down, test_left, test_right, test_up,
-};
+use crate::{Coord, Field, test_down, test_left, test_right, test_up};
 
 /// generate a new random field using provided parameters
 pub fn generate_field(

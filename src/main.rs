@@ -2,10 +2,11 @@
 
 use clap::Parser;
 use cli::Cli;
-use generator::generate_field;
+use generator::*;
 use log::*;
-use pathfinding::is_field_accessible;
-use solver::solve;
+use pathfinding::*;
+use renderer::*;
+use solver::*;
 use utils::*;
 
 /// cli types and definitions
@@ -34,8 +35,8 @@ fn main() {
                 false => println!("ERR: flood-fill couldn't reach all cells"),
             }
         }
-        cli::Commands::Solve { map, pretty } => {
-            solve(map, pretty);
+        cli::Commands::Solve { map, out, pretty } => {
+            solve(map, out, pretty);
         }
         cli::Commands::Generate {
             size,
@@ -63,5 +64,10 @@ fn main() {
             }
             Err(e) => error!("can not generate maze: {e}"),
         },
+        cli::Commands::Render {
+            map,
+            paths,
+            out_file,
+        } => render_tikz(map, paths, out_file),
     };
 }

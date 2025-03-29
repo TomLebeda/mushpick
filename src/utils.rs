@@ -1,6 +1,7 @@
 use std::{fmt::Display, fs, path::PathBuf};
 
 use log::*;
+use serde::{Deserialize, Serialize};
 
 /// returns true if the cell on LEFT exists and is available (free, true), otherwise returns false
 pub fn test_left(cells: &[bool], pos: usize, size: usize) -> bool {
@@ -83,7 +84,7 @@ pub struct Field {
 }
 
 /// General structure that represents named [X,Y] value
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Coord {
     /// X-coordinate
     pub x: usize,

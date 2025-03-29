@@ -29,6 +29,8 @@ pub enum Commands {
     Solve {
         /// Path to the map file
         map: PathBuf,
+        /// Path to the output file where the results will be stored
+        out: PathBuf,
         /// if set, print out the result as an ascii-art
         #[arg(long, short = 'P')]
         pretty: bool,
@@ -59,5 +61,14 @@ pub enum Commands {
         /// save the maze (as parsable text) into given file instead of printing out, useful with --pretty
         #[arg(long, short)]
         save: Option<PathBuf>,
+    },
+    /// Render input map and optionally paths as tikz code for pretty pictures
+    Render {
+        /// file where the map is stored
+        map: PathBuf,
+        /// file where the output tikz code will be saved
+        out_file: PathBuf,
+        /// file where the paths are stored
+        paths: Option<PathBuf>,
     },
 }

@@ -1,0 +1,12 @@
+#!/bin/bash
+tectonic -Z shell-escape-cwd=./ main.tex;
+rm -f main.aux;
+rm -f main.auxlock;
+rm -f main.xdv;
+if [ -s main.log ]; then
+	echo "LOG from main.log:";
+	cat main.log
+else
+	rm -f main.log
+fi
+mv main.pdf NAME_HERE.pdf

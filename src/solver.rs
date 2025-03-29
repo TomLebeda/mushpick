@@ -1,16 +1,28 @@
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::PathBuf};
 
 use itertools::Itertools;
 use log::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
-    Field, parse_field,
+    Coord, Field, parse_field,
     pathfinding::{get_m2m_dist_matrix, get_p2m_dist_matrix, is_field_accessible, pathfind_split},
 };
 
+#[derive(Serialize, Deserialize)]
+/// Solution for single player
+pub struct Result {
+    /// indices of mushrooms picked by given player
+    pub mushrooms: Vec<usize>,
+    /// list of coordinates where the player moved
+    pub steps: Vec<Coord>,
+    /// total cost of the path
+    pub cost: usize,
+}
+
 /// Solve the map on provided file path
-pub fn solve(map: PathBuf, pretty: bool) {
+pub fn solve(map: PathBuf, out: PathBuf, pretty: bool) {
     let field = parse_field(&map);
     match is_field_accessible(&field.cells, field.size) {
         true => info!("all cells are accessible"),
@@ -86,6 +98,7 @@ pub fn solve(map: PathBuf, pretty: bool) {
             best_split = optimized_split;
         }
     }
+
     println!("FINAL BEST SPLIT (total cost {best_split_cost}): ");
     for (p, (mush, cost)) in best_split.iter().enumerate() {
         println!("- P{p}: {mush:?} (cost {cost})");
@@ -99,9 +112,25 @@ pub fn solve(map: PathBuf, pretty: bool) {
             path.iter().map(|c| format!("{c}")).join(", ")
         );
     }
-
     if pretty {
         println!("{}", field.render_pretty(Some(&paths)));
+    }
+
+    let mut results: HashMap<String, Result> = HashMap::new();
+    for (idx, ((mushrooms, cost), coords)) in best_split.iter().zip(paths).enumerate() {
+        results.insert(
+            format!("P{idx}"),
+            Result {
+                mushrooms: mushrooms.clone(),
+                steps: coords,
+                cost: *cost,
+            },
+        );
+    }
+
+    let res_json = serde_json::to_string_pretty(&results).unwrap();
+    if std::fs::write(&out, res_json).is_err() {
+        error!("Failed to save output into file.");
     }
 }
 
