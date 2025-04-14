@@ -7,12 +7,14 @@ use rand::{
 use crate::{Coord, Field, test_down, test_left, test_right, test_up};
 
 /// generate a new random field using provided parameters
-pub fn generate_field(
+pub fn generate_fields(
     size: usize,
     walls: usize,
     players: usize,
     mushrooms: usize,
-) -> Result<Field, String> {
+    count: u32,
+) -> Result<Vec<Field>, String> {
+    let mut field_buffer: Vec<Field> = Vec::with_capacity(count as usize);
     if walls > size * size {
         return Err(format!("more walls ({walls}) than cells ({})", size * size));
     }
@@ -21,89 +23,92 @@ pub fn generate_field(
             "not enough empty cells for players and mushrooms",
         ));
     }
-    let mut map: Vec<bool> = generate_maze(size).concat();
-    let wall_count = map.iter().filter(|b| return !(**b)).count();
-    let walls_to_change: i32 = wall_count as i32 - walls as i32;
+    for _idx in 0..count {
+        let mut map: Vec<bool> = generate_maze(size).concat();
+        let wall_count = map.iter().filter(|b| return !(**b)).count();
+        let walls_to_change: i32 = wall_count as i32 - walls as i32;
 
-    let mut rng = rand::rng();
-    if walls_to_change > 0 {
-        // we need to remove some walls
-        let mut wall_indicies: Vec<usize> = map
-            .iter()
-            .enumerate()
-            .filter(|(_i, b)| return !(**b))
-            .map(|(i, _b)| return i)
-            .collect();
-        wall_indicies.shuffle(&mut rng);
-        for i in 0..walls_to_change {
-            map[wall_indicies[i as usize]] = true;
-        }
-    }
-    if walls_to_change < 0 {
-        let walls_to_fill = -walls_to_change;
-        for _ in 0..walls_to_fill {
-            let dead_end_indicies: Vec<usize> = map
+        let mut rng = rand::rng();
+        if walls_to_change > 0 {
+            // we need to remove some walls
+            let mut wall_indicies: Vec<usize> = map
                 .iter()
                 .enumerate()
-                .filter(|(i, b)| -> bool {
-                    // keep only the cells that are free and have exactly one free neighbor (= dead ends)
-                    let free = **b;
-                    if !free {
-                        return false;
-                    }
-                    let directions = [test_left, test_right, test_up, test_down];
-                    let free_neighbor_count = directions
-                        .iter()
-                        .filter(|&dir| return dir(&map, *i, size))
-                        .count();
-                    return free_neighbor_count == 1;
-                })
+                .filter(|(_i, b)| return !(**b))
                 .map(|(i, _b)| return i)
                 .collect();
-            let dead_end_to_fill = dead_end_indicies.choose(&mut rng).unwrap();
-            map[*dead_end_to_fill] = false;
+            wall_indicies.shuffle(&mut rng);
+            for i in 0..walls_to_change {
+                map[wall_indicies[i as usize]] = true;
+            }
         }
+        if walls_to_change < 0 {
+            let walls_to_fill = -walls_to_change;
+            for _ in 0..walls_to_fill {
+                let dead_end_indicies: Vec<usize> = map
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, b)| -> bool {
+                        // keep only the cells that are free and have exactly one free neighbor (= dead ends)
+                        let free = **b;
+                        if !free {
+                            return false;
+                        }
+                        let directions = [test_left, test_right, test_up, test_down];
+                        let free_neighbor_count = directions
+                            .iter()
+                            .filter(|&dir| return dir(&map, *i, size))
+                            .count();
+                        return free_neighbor_count == 1;
+                    })
+                    .map(|(i, _b)| return i)
+                    .collect();
+                let dead_end_to_fill = dead_end_indicies.choose(&mut rng).unwrap();
+                map[*dead_end_to_fill] = false;
+            }
+        }
+        let mut available_indices: Vec<usize> = map
+            .iter()
+            .enumerate()
+            .filter_map(|(i, b)| match b {
+                true => return Some(i),
+                false => return None,
+            })
+            .collect();
+
+        available_indices.shuffle(&mut rng);
+        let player_coords = available_indices
+            .get(0..players)
+            .unwrap()
+            .iter()
+            .map(|i| {
+                return Coord {
+                    x: i % size,
+                    y: (i - (i % size)) / size,
+                };
+            })
+            .collect_vec();
+        let mush_coords = available_indices
+            .get(players..players + mushrooms)
+            .unwrap()
+            .iter()
+            .map(|i| {
+                return Coord {
+                    x: i % size,
+                    y: (i - (i % size)) / size,
+                };
+            })
+            .collect_vec();
+
+        let field = Field {
+            size,
+            mushrooms: mush_coords,
+            players: player_coords,
+            cells: map,
+        };
+        field_buffer.push(field);
     }
-    let mut available_indices: Vec<usize> = map
-        .iter()
-        .enumerate()
-        .filter_map(|(i, b)| match b {
-            true => return Some(i),
-            false => return None,
-        })
-        .collect();
-
-    available_indices.shuffle(&mut rng);
-    let player_coords = available_indices
-        .get(0..players)
-        .unwrap()
-        .iter()
-        .map(|i| {
-            return Coord {
-                x: i % size,
-                y: (i - (i % size)) / size,
-            };
-        })
-        .collect_vec();
-    let mush_coords = available_indices
-        .get(players..players + mushrooms)
-        .unwrap()
-        .iter()
-        .map(|i| {
-            return Coord {
-                x: i % size,
-                y: (i - (i % size)) / size,
-            };
-        })
-        .collect_vec();
-
-    let field = Field {
-        size,
-        mushrooms: mush_coords,
-        players: player_coords,
-        cells: map,
-    };
-    return Ok(field);
+    return Ok(field_buffer);
 }
 
 /// generates a random perfect maze in a square grid of given size using recursive backtracking

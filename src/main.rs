@@ -3,6 +3,7 @@
 use clap::Parser;
 use cli::Cli;
 use generator::*;
+use itertools::Itertools;
 use log::*;
 use pathfinding::*;
 use renderer::*;
@@ -45,9 +46,14 @@ fn main() {
             walls,
             pretty,
             save,
-        } => match generate_field(size, walls, players, mushrooms) {
-            Ok(field) => {
-                let parsable = field.render_parsable();
+            batch,
+            batch_separator,
+        } => match generate_fields(size, walls, players, mushrooms, batch) {
+            Ok(fields) => {
+                let parsable = fields
+                    .iter()
+                    .map(|f| return f.render_parsable())
+                    .join(&format!("\n{batch_separator}\n"));
                 if let Some(path) = save {
                     if std::fs::write(&path, &parsable).is_err() {
                         error!("can't write the output file {}", path.display());
@@ -57,7 +63,10 @@ fn main() {
                     }
                 }
                 if pretty {
-                    println!("{}", field.render_pretty(None));
+                    for (idx, field) in fields.iter().enumerate() {
+                        println!("\nrandom field #{}: ", idx + 1);
+                        println!("{}", field.render_pretty(None));
+                    }
                 } else {
                     println!("{}", parsable);
                 }

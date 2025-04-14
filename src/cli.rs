@@ -58,6 +58,14 @@ pub enum Commands {
         #[arg(long, short = 'P')]
         pretty: bool,
 
+        /// repeat the random generation multiple times and save/show all the results at once
+        #[arg(long, short, default_value_t = 1)]
+        batch: u32,
+
+        /// string used to separate fields when using batch generation
+        #[arg(long, alias = "sep", short = 's', default_value_t = String::from("====="))]
+        batch_separator: String,
+
         /// save the maze (as parsable text) into given file instead of printing out, useful with --pretty
         #[arg(long, short)]
         save: Option<PathBuf>,
