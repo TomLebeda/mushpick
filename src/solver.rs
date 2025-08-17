@@ -22,8 +22,8 @@ pub struct Result {
 }
 
 /// Solve the map on provided file path
-pub fn solve(map: PathBuf, out: PathBuf, pretty: bool) {
-    let field = parse_field(&map);
+pub fn solve(map_file: PathBuf) {
+    let field = parse_field(&map_file);
     match is_field_accessible(&field.cells, field.size) {
         true => info!("all cells are accessible"),
         false => {
@@ -32,88 +32,48 @@ pub fn solve(map: PathBuf, out: PathBuf, pretty: bool) {
         }
     }
 
-    //let split_count = field.players.len().pow(field.mushrooms.len() as u32);
-    //println!("- map size: {}", field.size);
-    //println!("- player count: {}", field.players.len());
-    //println!("- mushroom count: {}", field.mushrooms.len());
-    //println!(
-    //    "- # of possible ways to split mushrooms between players: {}^{} = {}",
-    //    field.players.len(),
-    //    field.mushrooms.len(),
-    //    split_count
-    //);
-    //println!(
-    //    "- # of possible ways to pick up mushrooms: {}^{} * {}!",
-    //    field.players.len(),
-    //    field.mushrooms.len(),
-    //    field.mushrooms.len(),
-    //);
-
     let m2m_dist = get_m2m_dist_matrix(&field);
-    //println!("m2m_dist: ");
-    //print_matrix(&m2m_dist);
     let p2m_dist = get_p2m_dist_matrix(&field);
-    //println!("p2m_dist: ");
-    //print_matrix(&p2m_dist);
     let min_mush_cost = get_mush_min_costs(&m2m_dist, &p2m_dist);
-    //println!("min mush cost: {min_mush_cost:?}");
 
     let greedy_split = get_greedy_split(&field, &p2m_dist);
-    //println!("\ngreedy split:");
-    //for (pi, m) in greedy_split.iter().enumerate() {
-    //    println!("- P{pi}: {m:?}");
-    //}
-
     let optimized_greedy_split = optimize_split(usize::MAX, &greedy_split, &m2m_dist, &p2m_dist);
-    //println!("\noptimized greedy split:");
-    //for (player_idx, (mush_seq, cost)) in optimized_greedy_split.iter().enumerate() {
-    //    println!("- P{player_idx}: {mush_seq:?} (cost {cost})");
-    //}
+
     let mut best_split_cost = optimized_greedy_split
         .iter()
         .map(|x| return x.1)
         .max()
         .unwrap_or(usize::MAX);
-    //println!("- total cost: {best_split_cost}");
     let mut best_split = optimized_greedy_split;
 
     let split_generator = generate_splits(field.mushrooms.len(), field.players.len()).enumerate();
     for (_split_idx, split) in split_generator {
-        //println!("\nsplit {split_idx}: {split:?}");
         let lower_bound = get_split_cost_lower_bound(&split, &min_mush_cost);
-        //println!("- lower bound cost: {lower_bound}");
         if lower_bound >= best_split_cost {
-            //println!("- skipping: lower bound too expensive, best is {best_split_cost})");
             continue;
         }
         let optimized_split = optimize_split(best_split_cost, &split, &m2m_dist, &p2m_dist);
         let optimized_split_cost = optimized_split.iter().map(|x| return x.1).max().unwrap();
-        //for (p, (mush, cost)) in optimized_split.iter().enumerate() {
-        //    println!("- P{p}: {mush:?} (cost {cost})")
-        //}
-        //println!("- total cost: {optimized_split_cost}");
         if optimized_split_cost < best_split_cost {
-            //println!("FOUND NEW BEST!");
             best_split_cost = optimized_split_cost;
             best_split = optimized_split;
         }
     }
 
-    println!("FINAL BEST SPLIT (total cost {best_split_cost}): ");
-    for (p, (mush, cost)) in best_split.iter().enumerate() {
-        println!("- P{p}: {mush:?} (cost {cost})");
-    }
-
-    println!("\nFINAL SPLIT PATHS: ");
     let paths = pathfind_split(&best_split, &field);
     for (player, path) in paths.iter().enumerate() {
-        println!(
-            "- P{player}: {{{}}}",
-            path.iter().map(|c| format!("{c}")).join(", ")
-        );
-    }
-    if pretty {
-        println!("{}", field.render_pretty(Some(&paths)));
+        print!("P{player}:");
+        for (c1, c2) in path.iter().tuple_windows() {
+            let diff: (i32, i32) = (c2.x as i32 - c1.x as i32, c2.y as i32 - c1.y as i32);
+            match diff {
+                (0, -1) => print!("u"), // Y direction is counted downwards
+                (0, 1) => print!("d"),
+                (1, 0) => print!("r"),
+                (-1, 0) => print!("l"),
+                _ => print!("?"),
+            }
+        }
+        println!();
     }
 
     let mut results: HashMap<String, Result> = HashMap::new();

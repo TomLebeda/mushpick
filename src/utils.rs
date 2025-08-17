@@ -3,6 +3,62 @@ use std::{fmt::Display, fs, path::PathBuf};
 use log::*;
 use serde::{Deserialize, Serialize};
 
+pub enum Direction {
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
+}
+
+impl Direction {
+    pub fn get_all_dirs() -> Vec<Direction> {
+        return vec![
+            Direction::UP,
+            Direction::DOWN,
+            Direction::LEFT,
+            Direction::RIGHT,
+        ];
+    }
+
+    pub fn as_diff(&self) -> (i32, i32) {
+        return match self {
+            Direction::UP => (0, -1), // Y is counted downwards
+            Direction::DOWN => (0, 1),
+            Direction::LEFT => (-1, 0),
+            Direction::RIGHT => (1, 0),
+        };
+    }
+
+    pub fn as_char(&self) -> char {
+        return match self {
+            Direction::UP => 'u',
+            Direction::DOWN => 'd',
+            Direction::LEFT => 'l',
+            Direction::RIGHT => 'r',
+        };
+    }
+
+    pub fn from_diff(diff: (i32, i32)) -> Option<Direction> {
+        return match diff {
+            (0, -1) => Some(Direction::UP), // Y is counted downwards
+            (0, 1) => Some(Direction::DOWN),
+            (-1, 0) => Some(Direction::LEFT),
+            (1, 0) => Some(Direction::RIGHT),
+            _ => None,
+        };
+    }
+
+    pub fn from_char(c: char) -> Option<Direction> {
+        return match c {
+            'u' => Some(Direction::UP),
+            'd' => Some(Direction::DOWN),
+            'l' => Some(Direction::LEFT),
+            'r' => Some(Direction::RIGHT),
+            _ => None,
+        };
+    }
+}
+
 /// returns true if the cell on LEFT exists and is available (free, true), otherwise returns false
 pub fn test_left(cells: &[bool], pos: usize, size: usize) -> bool {
     return pos % size != 0 && cells[pos - 1];

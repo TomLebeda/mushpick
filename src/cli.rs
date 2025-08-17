@@ -15,26 +15,28 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 /// Basic commands available via the CLI
 pub enum Commands {
-    /// Check if the map is ok
+    /// Check if the map is ok and optionally if the provided solution solves the provided map.
     ///
     /// This command will attempt to parse the file and then use flood-fill algorithm to check if all
     /// non-obstacle cells are accessible.
     Check {
         /// Path to the map file
-        map: PathBuf,
+        map_file: PathBuf,
+        /// Path to the solution file
+        solution_file: Option<PathBuf>,
     },
+
     /// Solve the provided map
     ///
     /// This command will attempt to parse the file and find the best solution.
+    /// The solution will be printed into stdout in the format `P<player-index>:<steps>`
+    /// where steps is string made out of "l" "r" "u" "d" for 4-direction steps.
+    /// One player-steps per output line
     Solve {
         /// Path to the map file
-        map: PathBuf,
-        /// Path to the output file where the results will be stored
-        out: PathBuf,
-        /// if set, print out the result as an ascii-art
-        #[arg(long, short = 'P')]
-        pretty: bool,
+        map_file: PathBuf,
     },
+
     /// Generate a new map that is guaranteed to be solvable
     #[clap(alias = "gen")]
     Generate {
@@ -58,18 +60,11 @@ pub enum Commands {
         #[arg(long, short = 'P')]
         pretty: bool,
 
-        /// repeat the random generation multiple times and save/show all the results at once
-        #[arg(long, short, default_value_t = 1)]
-        batch: u32,
-
-        /// string used to separate fields when using batch generation
-        #[arg(long, alias = "sep", short = 's', default_value_t = String::from("====="))]
-        batch_separator: String,
-
-        /// save the maze (as parsable text) into given file instead of printing out, useful with --pretty
+        /// save the maze (as parsable text) into a text file instead of printing out, useful with --pretty
         #[arg(long, short)]
-        save: Option<PathBuf>,
+        save: bool,
     },
+
     /// Render input map and optionally paths as tikz code for pretty pictures
     Render {
         /// file where the map is stored

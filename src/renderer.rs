@@ -157,6 +157,7 @@ pub fn render_tikz(map_file: PathBuf, solution_file: Option<PathBuf>, output_fil
 }
 
 /// Helper function that will print out formatted matrix
+#[allow(dead_code)]
 pub fn print_matrix(mat: &Vec<Vec<usize>>) {
     let max_item = mat
         .iter()

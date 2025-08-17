@@ -1,5 +1,7 @@
 //! CLI tool to solve mushroom-picker game using BFS algorithm
 
+use std::path::PathBuf;
+
 use clap::Parser;
 use cli::Cli;
 use generator::*;
@@ -28,17 +30,11 @@ fn main() {
     env_logger::Builder::new().init();
 
     match cli.command {
-        cli::Commands::Check { map } => {
-            let field = parse_field(&map);
-            info!("map parsed successfully");
-            match is_field_accessible(&field.cells, field.size) {
-                true => println!("OK: all cells are accessible"),
-                false => println!("ERR: flood-fill couldn't reach all cells"),
-            }
-        }
-        cli::Commands::Solve { map, out, pretty } => {
-            solve(map, out, pretty);
-        }
+        cli::Commands::Check {
+            map_file,
+            solution_file,
+        } => run_check(map_file, solution_file),
+        cli::Commands::Solve { map_file } => solve(map_file),
         cli::Commands::Generate {
             size,
             players,
@@ -46,37 +42,64 @@ fn main() {
             walls,
             pretty,
             save,
-            batch,
-            batch_separator,
-        } => match generate_fields(size, walls, players, mushrooms, batch) {
-            Ok(fields) => {
-                let parsable = fields
-                    .iter()
-                    .map(|f| return f.render_parsable())
-                    .join(&format!("\n{batch_separator}\n"));
-                if let Some(path) = save {
-                    if std::fs::write(&path, &parsable).is_err() {
-                        error!("can't write the output file {}", path.display());
-                        info!("here is the content, so you don't loose it:\n{}", &parsable);
-                    } else {
-                        info!("output written into {}", path.display());
-                    }
-                }
-                if pretty {
-                    for (idx, field) in fields.iter().enumerate() {
-                        println!("\nrandom field #{}: ", idx + 1);
-                        println!("{}", field.render_pretty(None));
-                    }
-                } else {
-                    println!("{}", parsable);
-                }
-            }
-            Err(e) => error!("can not generate maze: {e}"),
-        },
+        } => run_generate(size, players, mushrooms, walls, pretty, save),
         cli::Commands::Render {
             map,
             paths,
             out_file,
         } => render_tikz(map, paths, out_file),
     };
+}
+
+/// Run the command `check`
+fn run_check(map_file: PathBuf, solution_file: Option<PathBuf>) {
+    let field = parse_field(&map_file);
+    trace!("map parsed successfully");
+    match is_field_accessible(&field.cells, field.size) {
+        true => println!("map OK: all cells are accessible"),
+        false => println!("map invalid: flood-fill couldn't reach all cells"),
+    }
+
+    if let Some(solution_file) = solution_file {
+        let Ok(contents) = std::fs::read_to_string(&solution_file) else {
+            error!("Failed to read file {}", &solution_file.display());
+            std::process::exit(exitcode::IOERR);
+        };
+        let lines = contents.lines();
+        let solution_map: HashMap<i32, Vec<char>>
+    };
+}
+
+/// Run the `generate` command
+#[allow(clippy::too_many_arguments)]
+fn run_generate(
+    size: usize,
+    players: usize,
+    mushrooms: usize,
+    walls: usize,
+    pretty: bool,
+    save: bool,
+) {
+    match generate_field(size, walls, players, mushrooms) {
+        Ok(field) => {
+            let parsable = field.render_parsable();
+            if save {
+                let timestamp = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
+                let path = format!("map_n{size}w{walls}p{players}m{mushrooms}_{timestamp}.txt");
+                match std::fs::write(&path, &parsable) {
+                    Err(e) => {
+                        error!("can't write the output file {}, err: {e}", path);
+                        info!("here is the content, so you don't loose it:\n{}", &parsable);
+                    }
+                    Ok(_) => info!("output written into {}", path),
+                }
+            }
+            if pretty {
+                println!("{}", field.render_pretty(None));
+            } else {
+                println!("{}", parsable);
+            }
+        }
+        Err(e) => error!("can not generate maze: {e}"),
+    }
 }
