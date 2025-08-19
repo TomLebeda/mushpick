@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(author = "Tomáš Lebeda <tom.lebeda@gmail.com>")]
@@ -10,6 +10,39 @@ pub struct Cli {
     /// Command to execute
     #[command(subcommand)]
     pub command: Commands,
+
+    /// level of logging details (into stderr)
+    #[arg(short, long, value_enum, default_value_t = LogLevel::Trace)]
+    pub log_level: LogLevel,
+
+    /// print the logging information into stdout instead of stderr
+    #[arg(long = "logstdout", default_value_t = false)]
+    pub log_to_stdout: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+#[allow(clippy::missing_docs_in_private_items)]
+pub enum LogLevel {
+    Warn,
+    Info,
+    Debug,
+    Trace,
+    Error,
+    Off,
+}
+
+impl LogLevel {
+    /// converts LogLevel into log::LevelFilter for env_logger initialization
+    pub fn to_log_filter(self) -> log::LevelFilter {
+        match self {
+            LogLevel::Trace => return log::LevelFilter::Trace,
+            LogLevel::Warn => return log::LevelFilter::Warn,
+            LogLevel::Info => return log::LevelFilter::Info,
+            LogLevel::Debug => return log::LevelFilter::Debug,
+            LogLevel::Error => return log::LevelFilter::Error,
+            LogLevel::Off => return log::LevelFilter::Off,
+        }
+    }
 }
 
 #[derive(Subcommand, Debug)]

@@ -88,10 +88,10 @@ pub fn solve(map_file: PathBuf) {
         );
     }
 
-    let res_json = serde_json::to_string_pretty(&results).unwrap();
-    if std::fs::write(&out, res_json).is_err() {
-        error!("Failed to save output into file.");
-    }
+    // let res_json = serde_json::to_string_pretty(&results).unwrap();
+    // if std::fs::write(&out, res_json).is_err() {
+    //     error!("Failed to save output into file.");
+    // }
 }
 
 /// Generate all ways to split N elements into M groups

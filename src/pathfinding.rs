@@ -16,8 +16,6 @@ pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Co
 
     let mut cells = cells.to_owned();
     let mut layers: Vec<Vec<Node>> = vec![vec![Node {
-        //x: start.x,
-        //y: start.y,
         coord: start.x + field_size * start.y,
         prev_coord: None,
     }]];

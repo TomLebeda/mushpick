@@ -160,7 +160,7 @@ fn generate_maze(size: usize, target_wall_count: i32) -> Vec<Vec<bool>> {
                 let nx = x as i32 + dx;
                 let ny = y as i32 + dy;
 
-                if in_bounds(nx, ny, size) {
+                if in_bounds(nx as isize, ny as isize, size) {
                     let nx_u = nx as usize;
                     let ny_u = ny as usize;
                     if !grid[ny_u][nx_u] {

@@ -3,58 +3,82 @@ use std::{fmt::Display, fs, path::PathBuf};
 use log::*;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug)]
+#[allow(clippy::missing_docs_in_private_items)]
+/// One of the 4 cardinal directions
 pub enum Direction {
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Direction::Up => return write!(f, "Up"),
+            Direction::Down => return write!(f, "Down"),
+            Direction::Left => return write!(f, "Left"),
+            Direction::Right => return write!(f, "Right"),
+        }
+    }
 }
 
 impl Direction {
+    /// Get a list of all directions
     pub fn get_all_dirs() -> Vec<Direction> {
         return vec![
-            Direction::UP,
-            Direction::DOWN,
-            Direction::LEFT,
-            Direction::RIGHT,
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
         ];
     }
 
+    /// Transform direction into coordinate-difference
     pub fn as_diff(&self) -> (i32, i32) {
         return match self {
-            Direction::UP => (0, -1), // Y is counted downwards
-            Direction::DOWN => (0, 1),
-            Direction::LEFT => (-1, 0),
-            Direction::RIGHT => (1, 0),
+            Direction::Up => (0, -1), // Y is counted downwards
+            Direction::Down => (0, 1),
+            Direction::Left => (-1, 0),
+            Direction::Right => (1, 0),
         };
     }
 
+    /// Transform direction into character code
     pub fn as_char(&self) -> char {
         return match self {
-            Direction::UP => 'u',
-            Direction::DOWN => 'd',
-            Direction::LEFT => 'l',
-            Direction::RIGHT => 'r',
+            Direction::Up => 'u',
+            Direction::Down => 'd',
+            Direction::Left => 'l',
+            Direction::Right => 'r',
         };
     }
 
+    /// Transform coordinate difference into a Direction
     pub fn from_diff(diff: (i32, i32)) -> Option<Direction> {
         return match diff {
-            (0, -1) => Some(Direction::UP), // Y is counted downwards
-            (0, 1) => Some(Direction::DOWN),
-            (-1, 0) => Some(Direction::LEFT),
-            (1, 0) => Some(Direction::RIGHT),
+            (0, -1) => Some(Direction::Up), // Y is counted downwards
+            (0, 1) => Some(Direction::Down),
+            (-1, 0) => Some(Direction::Left),
+            (1, 0) => Some(Direction::Right),
             _ => None,
         };
     }
 
-    pub fn from_char(c: char) -> Option<Direction> {
+    pub fn apply_step(&self, coord: &Coord) -> (i32, i32) {
+        let diff = self.as_diff();
+        return (coord.x as i32 + diff.0, coord.y as i32 + diff.1);
+    }
+
+    /// Transform char code into a Direction
+    pub fn from_char(c: char) -> Result<Direction, String> {
         return match c {
-            'u' => Some(Direction::UP),
-            'd' => Some(Direction::DOWN),
-            'l' => Some(Direction::LEFT),
-            'r' => Some(Direction::RIGHT),
-            _ => None,
+            'u' => Ok(Direction::Up),
+            'd' => Ok(Direction::Down),
+            'l' => Ok(Direction::Left),
+            'r' => Ok(Direction::Right),
+            c => Err(format!("no Direction has code '{c}'")),
         };
     }
 }
