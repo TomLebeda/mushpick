@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use itertools::Itertools;
 use log::*;
@@ -8,6 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use crate::{
     Coord, Field, parse_field,
     pathfinding::{get_m2m_dist_matrix, get_p2m_dist_matrix, is_field_accessible, pathfind_split},
+    utils::Direction,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -61,37 +62,14 @@ pub fn solve(map_file: PathBuf) {
     }
 
     let paths = pathfind_split(&best_split, &field);
-    for (player, path) in paths.iter().enumerate() {
-        print!("P{player}:");
+    for path in paths {
         for (c1, c2) in path.iter().tuple_windows() {
             let diff: (i32, i32) = (c2.x as i32 - c1.x as i32, c2.y as i32 - c1.y as i32);
-            match diff {
-                (0, -1) => print!("u"), // Y direction is counted downwards
-                (0, 1) => print!("d"),
-                (1, 0) => print!("r"),
-                (-1, 0) => print!("l"),
-                _ => print!("?"),
-            }
+            let direction = Direction::from_diff(diff).unwrap(); // my own solution shouldn't have invalid diffs
+            print!("{}", direction.as_char());
         }
-        println!();
+        println!(); // line break between players
     }
-
-    let mut results: HashMap<String, Result> = HashMap::new();
-    for (idx, ((mushrooms, cost), coords)) in best_split.iter().zip(paths).enumerate() {
-        results.insert(
-            format!("P{idx}"),
-            Result {
-                mushrooms: mushrooms.clone(),
-                steps: coords,
-                cost: *cost,
-            },
-        );
-    }
-
-    // let res_json = serde_json::to_string_pretty(&results).unwrap();
-    // if std::fs::write(&out, res_json).is_err() {
-    //     error!("Failed to save output into file.");
-    // }
 }
 
 /// Generate all ways to split N elements into M groups

@@ -1,4 +1,4 @@
-PWD /home/tom/Work/vyuka/bp_2024_martin_chott/mushpick/render_example
+PWD /home/tom/Projects/mushpick/render_example
 INPUT /var/lib/texmf/web2c/luahbtex/lualatex.fmt
 INPUT ./main.tex
 OUTPUT aux/main.log
@@ -141,4 +141,5 @@ INPUT /home/tom/.texlive/texmf-var/luatex-cache/generic/fonts/otl/lmroman8-regul
 OUTPUT aux/main.pdf
 INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map
 INPUT ./src/big.tex
+INPUT ./src/big_generated.tex
 INPUT ./aux/main.aux

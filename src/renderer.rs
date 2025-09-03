@@ -3,10 +3,10 @@ use std::{collections::HashMap, path::PathBuf};
 use itertools::Itertools;
 use log::*;
 
-use crate::{Coord, Field, Result, parse_field};
+use crate::{Coord, Field, Result, parse_field, utils::Direction};
 
 /// Render the inputs into a tikz code and save it into provided file
-pub fn render_tikz(map_file: PathBuf, solution_file: Option<PathBuf>, output_file: PathBuf) {
+pub fn render_tikz(map_file: PathBuf, output_file: PathBuf, solution_file: Option<PathBuf>) {
     let field = parse_field(&map_file);
     let mut buf = String::new();
 
@@ -99,23 +99,39 @@ pub fn render_tikz(map_file: PathBuf, solution_file: Option<PathBuf>, output_fil
     }
 
     // draw the solutions
-    if let Some(path) = solution_file {
-        let Ok(json_str) = std::fs::read_to_string(&path) else {
-            error!("Can't find or open file with solution {}.", &path.display());
+    if let Some(solution_file) = solution_file {
+        let Ok(contents) = std::fs::read_to_string(&solution_file) else {
+            error!("Failed to read file {}", &solution_file.display());
             std::process::exit(exitcode::IOERR);
         };
-        let Ok(results) = serde_json::from_str::<HashMap<String, Result>>(&json_str) else {
-            error!(
-                "Can't parse contents of file {} into expected json structure. Corrupted contents?",
-                &path.display()
-            );
-            std::process::exit(exitcode::DATAERR);
-        };
-        for (_player, result) in results {
+
+        let solution = contents
+            .lines()
+            .map(|line| return line.chars())
+            .map(|chars| {
+                return chars
+                    .map(|c| match Direction::from_char(c) {
+                        Ok(d) => return d,
+                        Err(e) => {
+                            error!("can't parse solution: {e}");
+                            println!("solution parsable: false");
+                            std::process::exit(exitcode::DATAERR);
+                        }
+                    })
+                    .collect_vec();
+            })
+            .collect_vec();
+
+        for (player_idx, steps) in solution.iter().enumerate() {
+            let first_coord = field.players[player_idx];
+            let coords = steps.iter().fold(vec![first_coord], |mut acc, dir| {
+                let new = dir.apply_step(acc.last().unwrap());
+                acc.push(new);
+                return acc;
+            });
             buf += &format!(
-                r"\draw[very thick, red, rounded corners=0.2cm] {};",
-                result
-                    .steps
+                r"\draw[very thick, red, rounded corners=0.2cm] {} ;",
+                coords
                     .iter()
                     .map(|s| return format!("({},{})", s.x as f32 + 0.5, s.y as f32 + 0.5))
                     .join(" -- ")
@@ -184,25 +200,25 @@ impl Field {
         let mush = '*';
         let picked = 'o';
         let stepped = '·';
-        let player_pos_flattened: Vec<usize> = self
+        let player_pos_flattened = self
             .players
             .iter()
-            .map(|p| return p.x + p.y * self.size)
-            .collect();
-        let mushrooms_pos_flattened: Vec<usize> = self
+            .map(|p| return p.x + p.y * self.size as i32)
+            .collect_vec();
+        let mushrooms_pos_flattened = self
             .mushrooms
             .iter()
-            .map(|p| return p.x + p.y * self.size)
-            .collect();
+            .map(|p| return p.x + p.y * self.size as i32)
+            .collect_vec();
         for r in 0..self.size {
             let mut row: Vec<char> = Vec::with_capacity(self.size);
             for c in 0..self.size {
                 let pos = r * self.size + c;
                 let cell = self.cells[pos];
                 if cell {
-                    if player_pos_flattened.contains(&pos) {
+                    if player_pos_flattened.contains(&(pos as i32)) {
                         row.push(player);
-                    } else if mushrooms_pos_flattened.contains(&pos) {
+                    } else if mushrooms_pos_flattened.contains(&(pos as i32)) {
                         row.push(mush);
                     } else {
                         row.push(path);
@@ -220,7 +236,11 @@ impl Field {
                         // skip the first coord, since it is a player
                         continue;
                     }
-                    let cell = buf.get_mut(step.y).unwrap().get_mut(step.x).unwrap();
+                    let cell = buf
+                        .get_mut(step.y as usize)
+                        .unwrap()
+                        .get_mut(step.x as usize)
+                        .unwrap();
                     if cell == &mush {
                         *cell = picked;
                     } else if cell == &path {
@@ -239,20 +259,21 @@ impl Field {
     /// render field into parsable ascii art
     pub fn render_parsable(&self) -> String {
         let mut buf = String::new();
-        let player_flat_idxs: Vec<usize> = self
+        let player_flat_idxs = self
             .players
             .iter()
-            .map(|c| return c.x + c.y * self.size)
-            .collect();
-        let mush_flat_idxs: Vec<usize> = self
+            .map(|c| return c.x + c.y * self.size as i32)
+            .collect_vec();
+        let mush_flat_idxs = self
             .mushrooms
             .iter()
-            .map(|c| return c.x + c.y * self.size)
-            .collect();
+            .map(|c| return c.x + c.y * self.size as i32)
+            .collect_vec();
         for (idx, free) in self.cells.iter().enumerate() {
             if idx > 0 && idx % self.size == 0 {
                 buf += "\n"
             }
+            let idx = idx as i32;
             if !free {
                 buf += "X ";
             } else if player_flat_idxs.contains(&idx) {

@@ -8,7 +8,6 @@ use generator::*;
 use itertools::Itertools;
 use log::*;
 use pathfinding::*;
-use regex::Regex;
 use renderer::*;
 use solver::*;
 use utils::*;
@@ -31,10 +30,6 @@ fn main() {
     env_logger::Builder::new()
         .filter_module("mushpick", cli.log_level.to_log_filter())
         .format_timestamp_micros()
-        .target(match cli.log_to_stdout {
-            true => env_logger::Target::Stdout,
-            false => env_logger::Target::Stderr,
-        })
         .init();
 
     match cli.command {
@@ -53,9 +48,9 @@ fn main() {
         } => run_generate(size, players, mushrooms, walls, pretty, save),
         cli::Commands::Render {
             map,
-            paths,
             out_file,
-        } => render_tikz(map, paths, out_file),
+            solution,
+        } => render_tikz(map, out_file, solution),
     };
 }
 
@@ -82,7 +77,7 @@ fn run_check(map_file: PathBuf, solution_file: Option<PathBuf>) {
             .map(|chars| {
                 return chars
                     .map(|c| match Direction::from_char(c) {
-                        Ok(d) => d,
+                        Ok(d) => return d,
                         Err(e) => {
                             error!("can't parse solution: {e}");
                             println!("solution parsable: false");
@@ -104,29 +99,26 @@ fn run_check(map_file: PathBuf, solution_file: Option<PathBuf>) {
                 std::process::exit(exitcode::DATAERR);
             };
             for step in steps {
-                let (new_x, new_y) = step.apply_step(&pos);
+                let new_pos = step.apply_step(&pos);
                 // check if the new position is in-bounds:
-                if new_x < 0
-                    || new_y < 0
-                    || new_x >= field.size as i32
-                    || new_y >= field.size as i32
+                if new_pos.x < 0
+                    || new_pos.y < 0
+                    || new_pos.x >= field.size as i32
+                    || new_pos.y >= field.size as i32
                 {
                     error!("player {player_idx} run out of map");
                     println!("solution passed: false");
                     std::process::exit(exitcode::DATAERR);
                 }
                 // check if the new position is free space:
-                let new_pos_flat = new_x + new_y * field.size as i32;
+                let new_pos_flat = new_pos.x + new_pos.y * field.size as i32;
                 if !field.cells[new_pos_flat as usize] {
                     error!("player {player_idx} run into a wall");
                     println!("solution passed: false");
                     std::process::exit(exitcode::DATAERR);
                 }
                 // update the position
-                pos = Coord {
-                    x: new_x as usize,
-                    y: new_y as usize,
-                };
+                pos = new_pos;
                 // check if the new position has a mushroom:
                 if let Some(mush_idx) = free_mushrooms
                     .iter()
@@ -161,16 +153,16 @@ fn run_generate(
                 let path = format!("maps/map_n{size}w{walls}p{players}m{mushrooms}_{ts}.txt");
                 match std::fs::write(&path, &parsable) {
                     Err(e) => {
-                        error!("can't write the output file {}, err: {e}", path);
+                        error!("can't write the output file {path}, err: {e}");
                         info!("here is the content, so you don't loose it:\n{}", &parsable);
                     }
-                    Ok(_) => info!("output written into {}", path),
+                    Ok(_) => info!("output written into {path}"),
                 }
             }
             if pretty {
                 println!("{}", field.render_pretty(None));
             } else {
-                println!("{}", parsable);
+                println!("{parsable}");
             }
         }
         Err(e) => error!("can not generate maze: {e}"),

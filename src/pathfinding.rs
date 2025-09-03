@@ -5,13 +5,13 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use crate::{Coord, Field, test_down, test_left, test_right, test_up};
 
 /// Find a shortest path using parallelized BFS algorithm
-pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Coord) -> Vec<Coord> {
+pub fn find_min_path(field_size: i32, cells: &[bool], start: &Coord, goal: &Coord) -> Vec<Coord> {
     #[derive(Debug)]
     struct Node {
         /// flattened XY coordinate of the cell
-        coord: usize,
+        coord: i32,
         /// index of the parent node in the previous layer/step
-        prev_coord: Option<usize>,
+        prev_coord: Option<i32>,
     }
 
     let mut cells = cells.to_owned();
@@ -27,28 +27,28 @@ pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Co
             .flat_map(|n: &Node| -> Vec<Node> {
                 let mut new_nodes = Vec::<Node>::with_capacity(4);
                 // test move RIGHT
-                if test_right(&cells, n.coord, field_size) {
+                if test_right(&cells, n.coord as usize, field_size as usize) {
                     new_nodes.push(Node {
                         coord: n.coord + 1,
                         prev_coord: Some(n.coord),
                     });
                 }
                 // test move DOWN
-                if test_down(&cells, n.coord, field_size) {
+                if test_down(&cells, n.coord as usize, field_size as usize) {
                     new_nodes.push(Node {
                         coord: n.coord + field_size,
                         prev_coord: Some(n.coord),
                     })
                 }
                 // test move LEFT
-                if test_left(&cells, n.coord, field_size) {
+                if test_left(&cells, n.coord as usize, field_size as usize) {
                     new_nodes.push(Node {
                         coord: n.coord - 1,
                         prev_coord: Some(n.coord),
                     })
                 }
                 // test move UP
-                if test_up(&cells, n.coord, field_size) {
+                if test_up(&cells, n.coord as usize, field_size as usize) {
                     new_nodes.push(Node {
                         coord: n.coord - field_size,
                         prev_coord: Some(n.coord),
@@ -93,7 +93,9 @@ pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Co
         }
 
         // mark the new layer as visited
-        new_layer.iter().for_each(|n| cells[n.coord] = false);
+        new_layer
+            .iter()
+            .for_each(|n| cells[n.coord as usize] = false);
 
         // add the new layer onto the stack
         layers.push(new_layer);
@@ -102,34 +104,34 @@ pub fn find_min_path(field_size: usize, cells: &[bool], start: &Coord, goal: &Co
 
 /// Find shortest path distance using parallelized BFS algorithm
 pub fn find_min_path_dist(
-    field_size: usize,
+    field_size: i32,
     cells: &[bool],
     start: &Coord,
     goal: &Coord,
 ) -> Option<usize> {
     let mut cells = cells.to_owned();
     let mut step_count = 0;
-    let mut last_layer: Vec<usize> = vec![start.x + field_size * start.y];
+    let mut last_layer = vec![start.x + field_size * start.y];
     loop {
         step_count += 1;
-        let new_layer: Vec<usize> = last_layer
+        let new_layer: Vec<i32> = last_layer
             .par_iter()
-            .flat_map(|n: &usize| -> Vec<usize> {
-                let mut new_nodes = Vec::<usize>::with_capacity(4);
+            .flat_map(|n| {
+                let mut new_nodes = Vec::<i32>::with_capacity(4);
                 // test move RIGHT
-                if test_right(&cells, *n, field_size) {
+                if test_right(&cells, *n as usize, field_size as usize) {
                     new_nodes.push(n + 1);
                 }
                 // test move DOWN
-                if test_down(&cells, *n, field_size) {
+                if test_down(&cells, *n as usize, field_size as usize) {
                     new_nodes.push(n + field_size)
                 }
                 // test move LEFT
-                if test_left(&cells, *n, field_size) {
+                if test_left(&cells, *n as usize, field_size as usize) {
                     new_nodes.push(n - 1)
                 }
                 // test move UP
-                if test_up(&cells, *n, field_size) {
+                if test_up(&cells, *n as usize, field_size as usize) {
                     new_nodes.push(n - field_size)
                 }
                 return new_nodes;
@@ -148,7 +150,7 @@ pub fn find_min_path_dist(
             return Some(step_count);
         }
         // mark the new layer as visited
-        new_layer.iter().for_each(|n| cells[*n] = false);
+        new_layer.iter().for_each(|n| cells[*n as usize] = false);
         // add the new layer onto the stack
         last_layer = new_layer;
     }
@@ -165,7 +167,7 @@ pub fn get_p2m_dist_matrix(field: &Field) -> Vec<Vec<usize>> {
         (0..mush_count).for_each(|m| {
             let start = field.players[p];
             let goal = field.mushrooms[m];
-            let dist = match find_min_path_dist(field.size, &field.cells, &start, &goal) {
+            let dist = match find_min_path_dist(field.size as i32, &field.cells, &start, &goal) {
                 Some(d) => d,
                 None => {
                     unreachable!("can't find path from {start:?} to {goal:?}");
@@ -187,7 +189,7 @@ pub fn get_m2m_dist_matrix(field: &Field) -> Vec<Vec<usize>> {
         for j in i + 1..mush_count {
             let start = field.mushrooms[i];
             let goal = field.mushrooms[j];
-            let dist = match find_min_path_dist(field.size, &field.cells, &start, &goal) {
+            let dist = match find_min_path_dist(field.size as i32, &field.cells, &start, &goal) {
                 Some(d) => d,
                 None => unreachable!("can't find path from {start:?} to {goal:?}"),
             };
@@ -260,7 +262,7 @@ pub fn pathfind_split(split: &[(Vec<usize>, usize)], field: &Field) -> Vec<Vec<C
             );
             let path = checkpoints
                 .tuple_windows()
-                .flat_map(|(a, b)| return find_min_path(field.size, &field.cells, &a, &b))
+                .flat_map(|(a, b)| return find_min_path(field.size as i32, &field.cells, &a, &b))
                 .dedup() // remove consecutive same coordinates
                 .collect_vec();
             return path;

@@ -14,10 +14,6 @@ pub struct Cli {
     /// level of logging details (into stderr)
     #[arg(short, long, value_enum, default_value_t = LogLevel::Trace)]
     pub log_level: LogLevel,
-
-    /// print the logging information into stdout instead of stderr
-    #[arg(long = "logstdout", default_value_t = false)]
-    pub log_to_stdout: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -74,7 +70,7 @@ pub enum Commands {
     #[clap(alias = "gen")]
     Generate {
         /// size of the map, value of N will produce N-by-N map
-        #[arg(long, short = 'n')]
+        #[arg(long, short = 's')]
         size: usize,
 
         /// number of walls placed in the map
@@ -82,19 +78,19 @@ pub enum Commands {
         walls: usize,
 
         /// number of players placed randomly in the map
-        #[arg(long, short)]
+        #[arg(long, short, default_value_t = 1)]
         players: usize,
 
         /// number of mushrooms placed randomly in the map
-        #[arg(long, short)]
+        #[arg(long, short, default_value_t = 1)]
         mushrooms: usize,
 
-        /// if enabled, print pretty (non-parsable!) version into stdout
+        /// if enabled, print pretty version into stdout
         #[arg(long, short = 'P')]
         pretty: bool,
 
         /// save the maze (as parsable text) into a text file instead of printing out, useful with --pretty
-        #[arg(long, short)]
+        #[arg(long)]
         save: bool,
     },
 
@@ -104,7 +100,7 @@ pub enum Commands {
         map: PathBuf,
         /// file where the output tikz code will be saved
         out_file: PathBuf,
-        /// file where the paths are stored
-        paths: Option<PathBuf>,
+        /// file where the solution is stored
+        solution: Option<PathBuf>,
     },
 }

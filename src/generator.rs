@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::*;
-use rand::{rngs::ThreadRng, seq::SliceRandom};
+use rand::{Rng, rngs::ThreadRng, seq::SliceRandom};
 
 use crate::{Coord, Field, utils::Direction};
 
@@ -60,8 +60,8 @@ pub fn generate_field(
         .iter()
         .map(|i| {
             return Coord {
-                x: i % size,
-                y: (i - (i % size)) / size,
+                x: (i % size) as i32,
+                y: ((i - (i % size)) / size) as i32,
             };
         })
         .collect_vec();
@@ -73,8 +73,8 @@ pub fn generate_field(
         .iter()
         .map(|i| {
             return Coord {
-                x: i % size,
-                y: (i - (i % size)) / size,
+                x: (i % size) as i32,
+                y: ((i - (i % size)) / size) as i32,
             };
         })
         .collect_vec();

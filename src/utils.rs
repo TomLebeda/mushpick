@@ -66,9 +66,14 @@ impl Direction {
         };
     }
 
-    pub fn apply_step(&self, coord: &Coord) -> (i32, i32) {
+    #[allow(dead_code)]
+    /// Apply step to a coordinate to get a new position
+    pub fn apply_step(&self, coord: &Coord) -> Coord {
         let diff = self.as_diff();
-        return (coord.x as i32 + diff.0, coord.y as i32 + diff.1);
+        return Coord {
+            x: coord.x + diff.0,
+            y: coord.y + diff.1,
+        };
     }
 
     /// Transform char code into a Direction
@@ -114,6 +119,7 @@ pub fn parse_field(path: &PathBuf) -> Field {
     let mut players: Vec<Coord> = vec![];
     let mut cells: Vec<bool> = vec![];
     contents.lines().enumerate().for_each(|(y, line)| {
+        let y = y as i32;
         let line = line.replace(" ", "");
         let line_len = line.chars().count();
         if line_len != size {
@@ -123,6 +129,7 @@ pub fn parse_field(path: &PathBuf) -> Field {
             std::process::exit(exitcode::DATAERR);
         };
         line.chars().enumerate().for_each(|(x, c)| {
+            let x = x as i32;
             match c {
                 'M' => {
                     mushrooms.push(Coord { x, y });
@@ -167,9 +174,9 @@ pub struct Field {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Coord {
     /// X-coordinate
-    pub x: usize,
+    pub x: i32,
     /// Y-coordinate
-    pub y: usize,
+    pub y: i32,
 }
 
 impl Display for Coord {
