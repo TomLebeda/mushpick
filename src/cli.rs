@@ -64,6 +64,9 @@ pub enum Commands {
     Solve {
         /// Path to the map file
         map_file: PathBuf,
+        /// skip the checks and solve as fast as possible, not guaranteed to find best solution
+        #[arg(long, short)]
+        fast: bool,
     },
 
     /// Generate a new map that is guaranteed to be solvable

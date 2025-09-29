@@ -31,13 +31,14 @@ fn main() {
         .filter_module("mushpick", cli.log_level.to_log_filter())
         .format_timestamp_micros()
         .init();
+    info!("started");
 
     match cli.command {
         cli::Commands::Check {
             map_file,
             solution_file,
         } => run_check(map_file, solution_file),
-        cli::Commands::Solve { map_file } => solve(map_file),
+        cli::Commands::Solve { map_file, fast } => solve(map_file, fast),
         cli::Commands::Generate {
             size,
             players,

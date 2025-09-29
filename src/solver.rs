@@ -23,22 +23,26 @@ pub struct Result {
 }
 
 /// Solve the map on provided file path
-pub fn solve(map_file: PathBuf) {
+pub fn solve(map_file: PathBuf, fast: bool) {
     let field = parse_field(&map_file);
-    match is_field_accessible(&field.cells, field.size) {
-        true => info!("all cells are accessible"),
-        false => {
-            error!("flood-fill couldn't reach all cells");
-            std::process::exit(exitcode::DATAERR);
+    if !fast {
+        match is_field_accessible(&field.cells, field.size) {
+            true => info!("all cells are accessible"),
+            false => {
+                error!("flood-fill couldn't reach all cells");
+                std::process::exit(exitcode::DATAERR);
+            }
         }
     }
 
+    trace!("starting search");
     let m2m_dist = get_m2m_dist_matrix(&field);
     let p2m_dist = get_p2m_dist_matrix(&field);
     let min_mush_cost = get_mush_min_costs(&m2m_dist, &p2m_dist);
 
     let greedy_split = get_greedy_split(&field, &p2m_dist);
-    let optimized_greedy_split = optimize_split(usize::MAX, &greedy_split, &m2m_dist, &p2m_dist);
+    let optimized_greedy_split =
+        optimize_split(usize::MAX, &greedy_split, &m2m_dist, &p2m_dist, fast);
 
     let mut best_split_cost = optimized_greedy_split
         .iter()
@@ -47,29 +51,36 @@ pub fn solve(map_file: PathBuf) {
         .unwrap_or(usize::MAX);
     let mut best_split = optimized_greedy_split;
 
-    let split_generator = generate_splits(field.mushrooms.len(), field.players.len()).enumerate();
-    for (_split_idx, split) in split_generator {
-        let lower_bound = get_split_cost_lower_bound(&split, &min_mush_cost);
-        if lower_bound >= best_split_cost {
-            continue;
-        }
-        let optimized_split = optimize_split(best_split_cost, &split, &m2m_dist, &p2m_dist);
-        let optimized_split_cost = optimized_split.iter().map(|x| return x.1).max().unwrap();
-        if optimized_split_cost < best_split_cost {
-            best_split_cost = optimized_split_cost;
-            best_split = optimized_split;
+    if !fast {
+        trace!("generating splits");
+        let split_generator =
+            generate_splits(field.mushrooms.len(), field.players.len()).enumerate();
+        for (_split_idx, split) in split_generator {
+            let lower_bound = get_split_cost_lower_bound(&split, &min_mush_cost);
+            if lower_bound >= best_split_cost {
+                continue;
+            }
+            let optimized_split =
+                optimize_split(best_split_cost, &split, &m2m_dist, &p2m_dist, fast);
+            let optimized_split_cost = optimized_split.iter().map(|x| return x.1).max().unwrap();
+            if optimized_split_cost < best_split_cost {
+                best_split_cost = optimized_split_cost;
+                best_split = optimized_split;
+            }
         }
     }
 
+    trace!("pathfinding split");
     let paths = pathfind_split(&best_split, &field);
     for path in paths {
         for (c1, c2) in path.iter().tuple_windows() {
-            let diff: (i32, i32) = (c2.x as i32 - c1.x as i32, c2.y as i32 - c1.y as i32);
+            let diff: (i32, i32) = (c2.x - c1.x, c2.y - c1.y);
             let direction = Direction::from_diff(diff).unwrap(); // my own solution shouldn't have invalid diffs
             print!("{}", direction.as_char());
         }
         println!(); // line break between players
     }
+    trace!("DONE");
 }
 
 /// Generate all ways to split N elements into M groups
@@ -136,6 +147,7 @@ pub fn optimize_split(
     split: &[Vec<usize>],
     m2m_dist: &[Vec<usize>],
     p2m_dist: &[Vec<usize>],
+    fast: bool,
 ) -> Vec<(Vec<usize>, usize)> {
     // for each player, find the best sequence of their mushrooms
     let optimized_sequences = split
@@ -144,7 +156,7 @@ pub fn optimize_split(
         .map(|(player_idx, mushrooms)| -> (Vec<usize>, usize) {
             // now find the actual best sequence with better threshold
             let (best_seq, cost) =
-                get_best_permutation(best_cost, mushrooms, player_idx, m2m_dist, p2m_dist);
+                get_best_permutation(best_cost, mushrooms, player_idx, m2m_dist, p2m_dist, fast);
             return (best_seq, cost);
         })
         .collect_vec();
@@ -230,6 +242,7 @@ fn get_best_permutation(
     player_idx: usize,
     m2m: &[Vec<usize>],
     p2m: &[Vec<usize>],
+    fast: bool,
 ) -> (Vec<usize>, usize) {
     if mush_idxs.is_empty() {
         // if there are no mushrooms to pick up, the cost is zero
@@ -243,20 +256,22 @@ fn get_best_permutation(
     // get the greedy permutation as a warm-up, to better leverage the pruning optimization
     let (greedy_perm, greedy_cost) = get_greedy_seq(mush_idxs, player_idx, m2m, p2m);
 
-    // now run the backtracking to actually find the best permutation
     let mut best_perm: Vec<usize> = greedy_perm;
-    let mut best_cost = std::cmp::min(best_cost, greedy_cost);
-    let mut mush_idxs: Vec<usize> = mush_idxs.into();
-    backtrack(
-        0,
-        0,
-        &mut mush_idxs,
-        &mut best_perm,
-        &mut best_cost,
-        player_idx,
-        m2m,
-        p2m,
-    );
+    if !fast {
+        // now run the backtracking to actually find the best permutation
+        let mut best_cost = std::cmp::min(best_cost, greedy_cost);
+        let mut mush_idxs: Vec<usize> = mush_idxs.into();
+        backtrack(
+            0,
+            0,
+            &mut mush_idxs,
+            &mut best_perm,
+            &mut best_cost,
+            player_idx,
+            m2m,
+            p2m,
+        );
+    }
     return (best_perm, best_cost);
 }
 
