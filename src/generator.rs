@@ -26,15 +26,36 @@ pub fn generate_field(
 
     trace!("correcting wall density");
     let wall_count = map.iter().filter(|b| return !(**b)).count();
-    let walls_to_change: i32 = wall_count as i32 - walls as i32;
+    let mut walls_to_change: i32 = wall_count as i32 - walls as i32;
     let mut rng = rand::rng();
     if walls_to_change > 0 {
         // we need to remove more walls
         let mut wall_indicies: Vec<usize> = map
             .iter()
             .enumerate()
-            .filter(|(_i, b)| return !(**b))
-            .map(|(i, _b)| return i)
+            .filter(|(_idx, free)| return !(**free)) // keep only those that are not free
+            .filter(|(idx, _free)| {
+                // keep only those that touch some other free cells
+                // cells at the edge can't check over-flowing neighbor cells
+                let left_edge = idx % size == 0;
+                let right_edge = idx % size == size - 1;
+                let top_edge = *idx < size;
+                let bottom_edge = *idx < size * size - size;
+                if !right_edge && map.get(idx + 1).is_some_and(|free| return *free) {
+                    return true;
+                }
+                if !left_edge && map.get(idx - 1).is_some_and(|free| return *free) {
+                    return true;
+                }
+                if !bottom_edge && map.get(idx + size).is_some_and(|free| return *free) {
+                    return true;
+                }
+                if !top_edge && map.get(idx - size).is_some_and(|free| return *free) {
+                    return true;
+                }
+                return false;
+            })
+            .map(|(idx, _free)| return idx)
             .collect();
         wall_indicies.shuffle(&mut rng);
         for i in 0..walls_to_change {

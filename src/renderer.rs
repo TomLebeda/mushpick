@@ -194,8 +194,8 @@ impl Field {
     pub fn render_pretty(&self, paths: Option<&Vec<Vec<Coord>>>) -> String {
         let mut buf: Vec<Vec<char>> = Vec::with_capacity(self.size);
         let wall = '█';
-        //let path = '░';
-        let path = ' ';
+        let path = '░';
+        // let path = ' ';
         let player = 'P';
         let mush = '*';
         let picked = 'o';

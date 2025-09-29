@@ -91,7 +91,7 @@ pub enum Commands {
 
         /// save the maze (as parsable text) into a text file instead of printing out, useful with --pretty
         #[arg(long)]
-        save: bool,
+        save: Option<Option<String>>,
     },
 
     /// Render input map and optionally paths as tikz code for pretty pictures

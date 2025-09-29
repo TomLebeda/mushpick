@@ -143,20 +143,28 @@ fn run_generate(
     mushrooms: usize,
     walls: usize,
     pretty: bool,
-    save: bool,
+    save: Option<Option<String>>,
 ) {
     match generate_field(size, walls, players, mushrooms) {
         Ok(field) => {
             let parsable = field.render_parsable();
-            if save {
-                let ts = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
-                let path = format!("maps/map_n{size}w{walls}p{players}m{mushrooms}_{ts}.txt");
-                match std::fs::write(&path, &parsable) {
+            if let Some(save_val) = save {
+                let save_file = match save_val {
+                    None => {
+                        let ts = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
+                        let path =
+                            format!("maps/map_n{size}w{walls}p{players}m{mushrooms}_{ts}.txt");
+                        path
+                    }
+                    Some(path) => path,
+                };
+
+                match std::fs::write(&save_file, &parsable) {
                     Err(e) => {
-                        error!("can't write the output file {path}, err: {e}");
+                        error!("can't write the output file {save_file}, err: {e}");
                         info!("here is the content, so you don't loose it:\n{}", &parsable);
                     }
-                    Ok(_) => info!("output written into {path}"),
+                    Ok(_) => info!("output written into {save_file}"),
                 }
             }
             if pretty {
