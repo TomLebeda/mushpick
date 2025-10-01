@@ -74,7 +74,18 @@ fn run_check(map_file: PathBuf, solution_file: Option<PathBuf>) {
 
         let solution = contents
             .lines()
-            .map(|line| return line.chars())
+            .map(|line| {
+                return line
+                    .split(':')
+                    .collect_vec()
+                    .get(1)
+                    .unwrap_or_else(|| {
+                        error!("can't parse solution: lines must have format P<n>:<steps>");
+                        println!("solution parsable: false");
+                        std::process::exit(exitcode::DATAERR);
+                    })
+                    .chars();
+            })
             .map(|chars| {
                 return chars
                     .map(|c| match Direction::from_char(c) {
