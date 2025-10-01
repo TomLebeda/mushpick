@@ -44,7 +44,6 @@ pub fn solve(map_file: PathBuf, fast: bool) {
         .map(|row| return row.iter().map(|path| return path.len()).collect_vec())
         .collect_vec();
     trace!(" - found m2m dist");
-    print_matrix(&m2m_dist);
 
     let p2m_paths = bfs_p2m(&field);
     let p2m_dist = p2m_paths
@@ -52,7 +51,6 @@ pub fn solve(map_file: PathBuf, fast: bool) {
         .map(|row| return row.iter().map(|path| return path.len()).collect_vec())
         .collect_vec();
     trace!(" - found p2m dist");
-    print_matrix(&p2m_dist);
 
     let min_mush_cost = get_mush_min_costs(&m2m_dist, &p2m_dist);
     trace!(" - found mush min costs");
