@@ -7,8 +7,9 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     Coord, Field, parse_field,
-    pathfinding::{get_m2m_dist_matrix, get_p2m_dist_matrix, is_field_accessible, pathfind_split},
-    utils::Direction,
+    pathfinding::{bfs_m2m, bfs_p2m, get_p2m_dist_matrix, is_field_accessible, pathfind_split},
+    renderer::print_matrix,
+    utils::{Direction, transpose},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -25,6 +26,7 @@ pub struct Result {
 /// Solve the map on provided file path
 pub fn solve(map_file: PathBuf, fast: bool) {
     let field = parse_field(&map_file);
+    trace!("field parsed");
     if !fast {
         match is_field_accessible(&field.cells, field.size) {
             true => info!("all cells are accessible"),
@@ -36,13 +38,29 @@ pub fn solve(map_file: PathBuf, fast: bool) {
     }
 
     trace!("starting search");
-    let m2m_dist = get_m2m_dist_matrix(&field);
-    let p2m_dist = get_p2m_dist_matrix(&field);
+    let m2m_paths = bfs_m2m(&field);
+    let m2m_dist = m2m_paths
+        .iter()
+        .map(|row| return row.iter().map(|path| return path.len()).collect_vec())
+        .collect_vec();
+    trace!(" - found m2m dist");
+
+    let p2m_paths = bfs_p2m(&field);
+    let p2m_dist = p2m_paths
+        .iter()
+        .map(|row| return row.iter().map(|path| return path.len()).collect_vec())
+        .collect_vec();
+    trace!(" - found p2m dist");
+
     let min_mush_cost = get_mush_min_costs(&m2m_dist, &p2m_dist);
+    trace!(" - found mush min costs");
 
     let greedy_split = get_greedy_split(&field, &p2m_dist);
+    trace!(" - found greedy split");
+
     let optimized_greedy_split =
         optimize_split(usize::MAX, &greedy_split, &m2m_dist, &p2m_dist, fast);
+    trace!(" - optimized greedy split");
 
     let mut best_split_cost = optimized_greedy_split
         .iter()
@@ -50,6 +68,7 @@ pub fn solve(map_file: PathBuf, fast: bool) {
         .max()
         .unwrap_or(usize::MAX);
     let mut best_split = optimized_greedy_split;
+    trace!(" - found cost of optimized greedy split");
 
     if !fast {
         trace!("generating splits");
@@ -71,15 +90,29 @@ pub fn solve(map_file: PathBuf, fast: bool) {
     }
 
     trace!("pathfinding split");
-    let paths = pathfind_split(&best_split, &field);
-    for path in paths {
-        for (c1, c2) in path.iter().tuple_windows() {
-            let diff: (i32, i32) = (c2.x - c1.x, c2.y - c1.y);
-            let direction = Direction::from_diff(diff).unwrap(); // my own solution shouldn't have invalid diffs
-            print!("{}", direction.as_char());
-        }
-        println!(); // line break between players
-    }
+    // let paths = pathfind_split(&best_split, &field);
+    best_split
+        .iter()
+        .enumerate()
+        .for_each(|(player_idx, (mush_seq, _split_cost))| {
+            if mush_seq.is_empty() {
+                println!()
+            }
+
+            // print out the path from player to first mushroom
+            p2m_paths[player_idx][mush_seq[0]]
+                .iter()
+                .for_each(|d| print!("{}", d.as_char()));
+
+            for (mush_idx_1, mush_idx_2) in mush_seq.iter().tuple_windows() {
+                // print the path from mush to mush
+                m2m_paths[*mush_idx_1][*mush_idx_2]
+                    .iter()
+                    .for_each(|d| print!("{}", d.as_char()));
+            }
+            println!() // separate lines for each player
+        });
+
     trace!("DONE");
 }
 
@@ -133,6 +166,7 @@ pub fn get_best_seq_all_perms(
 /// produce a greedy split, simply by assigning each mushroom to the nearest player
 pub fn get_greedy_split(field: &Field, p2m_dist: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let mut split: Vec<Vec<usize>> = vec![vec![]; field.players.len()];
+    let p2m_dist = transpose(p2m_dist.to_vec());
     for (mi, _) in field.mushrooms.iter().enumerate() {
         let nearest_player_idx = p2m_dist[mi].iter().position_min().unwrap();
         split[nearest_player_idx].push(mi);
@@ -167,18 +201,23 @@ pub fn optimize_split(
 
 /// Compute the minimum cost of each mushroom
 pub fn get_mush_min_costs(m2m_dist: &[Vec<usize>], p2m_dist: &[Vec<usize>]) -> Vec<usize> {
-    // create a local copy of the mush-to-mush distance matrix where the diagonal zeros will be
+    let mush_count = m2m_dist.len();
+    // create a local copy of the mush-to-mush distance matrix where the diagonal values will be
     // replaced by usize::MAX so that they are not picked as the minimum value
     // cloning here is fine, because this function should run only once per map
     let mut m2m_dist: Vec<Vec<usize>> = m2m_dist.into();
     (0..m2m_dist.len()).for_each(|i| m2m_dist[i][i] = usize::MAX);
 
-    let mut min_costs: Vec<usize> = Vec::with_capacity(m2m_dist.len());
+    let p2m_dist = transpose(p2m_dist.to_vec());
+
+    let mut min_costs: Vec<usize> = Vec::with_capacity(mush_count);
+
     for (idx, row) in m2m_dist.iter().enumerate() {
         let min_m2m = row.iter().min().unwrap();
         let min_p2m = p2m_dist[idx].iter().min().unwrap();
         min_costs.push(std::cmp::min(*min_m2m, *min_p2m));
     }
+
     return min_costs;
 }
 
@@ -215,16 +254,10 @@ pub fn get_greedy_seq(
                     return None;
                 }
                 let dist = match seq.last() {
-                    None => p2m[**mush_idx][player_idx],
+                    None => p2m[player_idx][**mush_idx],
                     Some(j) => m2m[*j][**mush_idx],
                 };
                 return Some((pos, mush_idx, dist));
-                //let start = match seq.last() {
-                //    None => player_idx,
-                //    Some(j) => j + player_count,
-                //};
-                //let goal = **mush_idx + player_count;
-                //return Some((pos, mush_idx, dist_mat[start][goal]));
             })
             .min_by_key(|x| return x.2)
             .unwrap();
@@ -305,9 +338,6 @@ fn backtrack(
             1 => {
                 // one elements => distance from player to first mush
                 p2m[numbers[0]][player_idx]
-                //let from = player_idx;
-                //let to = numbers[0];
-                //dist_mat[from][to]
             }
             _ => {
                 // multiple elements => cost is the last step mush-to-mush

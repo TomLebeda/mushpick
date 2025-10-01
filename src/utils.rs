@@ -3,7 +3,7 @@ use std::{fmt::Display, fs, path::PathBuf};
 use log::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(clippy::missing_docs_in_private_items)]
 /// One of the 4 cardinal directions
 pub enum Direction {
@@ -11,6 +11,26 @@ pub enum Direction {
     Down,
     Left,
     Right,
+}
+
+// transpose NxM matrix into MxN matrix
+pub fn transpose<T: Clone>(matrix: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    if matrix.is_empty() {
+        return vec![];
+    }
+
+    let rows = matrix.len();
+    let cols = matrix[0].len();
+
+    let mut transposed = vec![vec![matrix[0][0].clone(); rows]; cols];
+
+    for i in 0..rows {
+        for j in 0..cols {
+            transposed[j][i] = matrix[i][j].clone();
+        }
+    }
+
+    return transposed;
 }
 
 impl Display for Direction {
