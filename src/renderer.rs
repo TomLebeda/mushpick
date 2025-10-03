@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
 use itertools::Itertools;
 use log::*;
@@ -174,18 +174,36 @@ pub fn render_tikz(map_file: PathBuf, output_file: PathBuf, solution_file: Optio
 
 /// Helper function that will print out formatted matrix
 #[allow(dead_code)]
-pub fn print_matrix(mat: &Vec<Vec<usize>>) {
+pub fn print_matrix<T>(mat: &Vec<Vec<T>>)
+where
+    T: Display + Copy + Into<i128>,
+{
+    // Find max absolute value for digit width
     let max_item = mat
         .iter()
-        .map(|row: &Vec<usize>| return row.iter().max().unwrap_or(&0))
+        .flat_map(|row| return row.iter())
+        .map(|&x| return x.into().abs())
         .max()
-        .unwrap_or(&0);
-    let col_width = f32::log10(*max_item as f32).ceil() as usize + 2;
+        .unwrap_or(0);
+
+    // Number of digits, add 1 if negatives possible
+    let digit_width = if max_item == 0 {
+        1
+    } else {
+        (max_item as f64).log10().floor() as usize + 1
+    };
+
+    let has_negative = mat
+        .iter()
+        .flat_map(|r| return r.iter())
+        .any(|&x| return x.into() < 0);
+    let col_width = digit_width + if has_negative { 1 } else { 0 } + 1;
+
     for row in mat {
-        for cell in row {
-            print!("{cell:col_width$}");
+        for &cell in row {
+            print!("{:>width$}", cell, width = col_width);
         }
-        println!()
+        println!();
     }
 }
 

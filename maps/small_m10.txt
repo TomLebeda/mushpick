@@ -1,0 +1,10 @@
+X - - M X - - - - - 
+X - X M X M X X - X 
+- X - - X - - X - X 
+- X - X - - X X - - 
+- - - X M X - - X - 
+- X X M M - M X X - 
+- X X X X X X X - - 
+- - - M - - - - - X 
+X X X X X X - X - M 
+X - M - - - P - X - 
