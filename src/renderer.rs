@@ -1,9 +1,9 @@
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf};
 
 use itertools::Itertools;
 use log::*;
 
-use crate::{Coord, Field, Result, parse_field, utils::Direction};
+use crate::{Coord, Field, parse_field, utils::Direction};
 
 /// Render the inputs into a tikz code and save it into provided file
 pub fn render_tikz(map_file: PathBuf, output_file: PathBuf, solution_file: Option<PathBuf>) {

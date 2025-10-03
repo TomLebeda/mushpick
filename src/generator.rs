@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::*;
-use rand::{Rng, rngs::ThreadRng, seq::SliceRandom};
+use rand::{rngs::ThreadRng, seq::SliceRandom};
 
 use crate::{Coord, Field, utils::Direction};
 
@@ -26,7 +26,7 @@ pub fn generate_field(
 
     trace!("correcting wall density");
     let wall_count = map.iter().filter(|b| return !(**b)).count();
-    let mut walls_to_change: i32 = wall_count as i32 - walls as i32;
+    let walls_to_change: i32 = wall_count as i32 - walls as i32;
     let mut rng = rand::rng();
     if walls_to_change > 0 {
         // we need to remove more walls

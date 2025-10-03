@@ -24,6 +24,7 @@ pub fn transpose<T: Clone>(matrix: Vec<Vec<T>>) -> Vec<Vec<T>> {
 
     let mut transposed = vec![vec![matrix[0][0].clone(); rows]; cols];
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..rows {
         for j in 0..cols {
             transposed[j][i] = matrix[i][j].clone();
@@ -76,6 +77,7 @@ impl Direction {
     }
 
     /// Transform coordinate difference into a Direction
+    #[allow(dead_code)]
     pub fn from_diff(diff: (i32, i32)) -> Option<Direction> {
         return match diff {
             (0, -1) => Some(Direction::Up), // Y is counted downwards
