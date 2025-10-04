@@ -5,9 +5,8 @@ use itertools::Itertools;
 use log::*;
 
 use crate::{
-    Coord, Field, parse_field,
+    Coord, parse_field,
     pathfinding::{bfs_m2m, bfs_p2m, is_field_accessible},
-    utils::transpose,
 };
 
 /// global static bound for number of players (so I can use arrays instead of vectors for speed)
@@ -72,55 +71,6 @@ pub fn solve(map_file: PathBuf, fast: bool) {
         })
         .collect_vec();
     trace!(" - found p2m dist");
-    let min_mush_cost = get_mush_min_costs(&m2m_dist, &p2m_dist);
-
-    // trace!("OLD GREEDY SPLIT:");
-    // let old_greedy_split = get_greedy_split(&field, &p2m_dist);
-    // old_greedy_split
-    //     .iter()
-    //     .enumerate()
-    //     .for_each(|(p_idx, mush_seq)| {
-    //         trace!("   - P{}: {:?}", p_idx, mush_seq);
-    //     });
-    // let old_greedy_split_cost: u32 = old_greedy_split
-    //     .iter()
-    //     .enumerate()
-    //     .map(|(player_idx, mush_seq)| -> u32 {
-    //         return (mush_seq
-    //             .windows(2)
-    //             .map(|w| {
-    //                 return m2m_dist[w[0]][w[1]];
-    //             })
-    //             .sum::<u32>()
-    //             + p2m_dist[player_idx][mush_seq[0]]) as u32;
-    //     })
-    //     .sum();
-    // trace!(" - cost: {old_greedy_split_cost}");
-    //
-    // trace!("OPTIMIZED OLD GREEDY SPLIT:");
-    // let optimized_old_greedy_split =
-    //     optimize_split(u32::MAX, &old_greedy_split, &m2m_dist, &p2m_dist, fast);
-    // optimized_old_greedy_split
-    //     .iter()
-    //     .enumerate()
-    //     .for_each(|(p_idx, mush_seq)| {
-    //         trace!("   - P{}: {:?}", p_idx, mush_seq.0);
-    //     });
-    // let optimized_old_greedy_split_cost: u32 = optimized_old_greedy_split
-    //     .iter()
-    //     .map(|x| return x.clone().0)
-    //     .enumerate()
-    //     .map(|(player_idx, mush_seq)| -> u32 {
-    //         return (mush_seq
-    //             .windows(2)
-    //             .map(|w| {
-    //                 return m2m_dist[w[0]][w[1]];
-    //             })
-    //             .sum::<u32>()
-    //             + p2m_dist[player_idx][mush_seq[0]]) as u32;
-    //     })
-    //     .sum();
-    // trace!(" - cost: {optimized_old_greedy_split_cost}");
 
     // how the players split the mushrooms
     let mut greedy_split: Vec<Vec<usize>> = vec![Vec::with_capacity(n_mush); n_plr];
@@ -198,38 +148,65 @@ pub fn solve(map_file: PathBuf, fast: bool) {
         });
     trace!(" - cost: {optimized_greedy_split_cost}");
 
-    let mut best_split_cost = greedy_split_cost;
+    let mut best_split_cost = optimized_greedy_split_cost;
     let mut best_split = optimized_greedy_split;
     trace!(" - best split: {best_split:?}");
 
-    let mut i = 0;
+    let mut t = 0; // how many full splits were explored
+    let mut o = 0; // how many splits were optimized
+    let mut l = 0; // how many lower boundaries were computed
     if !fast {
         trace!("searching for best split...");
-        let split_gen = generate_splits(field.mushrooms.len(), field.players.len());
-
-        for split in split_gen {
-            i += 1;
-            // trace!("trying out split: {split:?}");
-            // trace!(" - best split ({best_split_cost}): {best_split:?}");
-            let lower_bound = get_split_cost_lower_bound(&split, &min_mush_cost);
-            trace!("lower bound: {lower_bound}, best: {best_split_cost}");
-            if lower_bound >= best_split_cost {
-                trace!(" - skipped (lower bound)");
-                continue;
+        // keep the lower bound outside of loop and mutable so we can early-stop while still building it
+        let mut stack = vec![(0, vec![Vec::new(); n_plr])];
+        while let Some((mush_idx, mut current_split)) = stack.pop() {
+            if mush_idx == n_mush {
+                // we have a full split => check it
+                t += 1;
+                let lower_bound = get_split_cost_lower_bound_mst(
+                    &current_split,
+                    &m2m_dist,
+                    &p2m_dist,
+                    n_plr,
+                    best_split_cost,
+                );
+                l += 1;
+                // seems promising, we need to fully optimize
+                if lower_bound >= best_split_cost {
+                    continue;
+                }
+                o += 1;
+                let optimized_split =
+                    optimize_split(best_split_cost, &current_split, &m2m_dist, &p2m_dist);
+                let optimized_split_cost = get_split_cost(&optimized_split, &m2m_dist, &p2m_dist);
+                if optimized_split_cost < best_split_cost {
+                    best_split_cost = optimized_split_cost;
+                    best_split = optimized_split;
+                }
+            } else {
+                for i in 0..n_plr {
+                    current_split[i].push(mush_idx);
+                    let lower_bound = get_split_cost_lower_bound_mst(
+                        &current_split,
+                        &m2m_dist,
+                        &p2m_dist,
+                        n_plr,
+                        best_split_cost,
+                    );
+                    l += 1;
+                    if lower_bound < best_split_cost {
+                        stack.push((mush_idx + 1, current_split.clone()))
+                    }
+                    current_split[i].pop();
+                }
             }
-            let optimized_split = optimize_split(best_split_cost, &split, &m2m_dist, &p2m_dist);
-            let optimized_split_cost = get_split_cost(&optimized_split, &m2m_dist, &p2m_dist);
-            // trace!(" - opt. split ({optimized_split_cost}): {optimized_split:?}");
-            if optimized_split_cost < best_split_cost {
-                best_split_cost = optimized_split_cost;
-                best_split = optimized_split;
-                // trace!("--------new best split: {best_split:?}");
-            }
-            // if i == 100 {
-            //     std::process::exit(1);
-            // }
         }
     }
+
+    let a = (n_plr as u128).pow(n_mush as u32);
+    trace!(
+        " === all possible {a}, full splits explored: {t}, optimized {o}, lower-bounds computed: {l}",
+    );
 
     trace!("BEST split:");
     best_split.iter().enumerate().for_each(|(p_idx, mush_seq)| {
@@ -264,254 +241,640 @@ pub fn solve(map_file: PathBuf, fast: bool) {
     trace!("DONE");
 }
 
-/// Generate all ways to split N elements into M groups
-pub fn generate_splits(
-    set_size: usize,
-    group_count: usize,
-) -> impl Iterator<Item = Vec<Vec<usize>>> {
-    return vec![0..group_count; set_size]
-        .into_iter()
-        .multi_cartesian_product()
-        .map(move |assignment| {
-            let mut groups = vec![Vec::new(); group_count];
-            for (i, &group) in assignment.iter().enumerate() {
-                groups[group].push(i);
-            }
-            return groups;
-        });
-}
+/// Compute the lower bound cost for given split, using early-stopping MST.
+///
+/// If the cost becomes larger or equal to best_split_cost, the algorithm
+/// will short-circuit and return the best_split_cost immediately.
+#[inline]
+fn get_split_cost_lower_bound_mst(
+    split: &[Vec<usize>],
+    m2m_dist: &[Vec<u32>],
+    p2m_dist: &[Vec<u32>],
+    n_plr: usize,
+    best_split_cost: u32,
+) -> u32 {
+    let mut lower_bound = 0;
 
-/// Compute the best sequence of mushrooms for given player, checking all possible permutations
-#[allow(dead_code)]
-#[deprecated]
-pub fn get_best_seq_all_perms(
-    best_cost: usize,
-    mush_idxs: &[usize],
-    player_idx: usize,
-    dist_mat: &[Vec<usize>],
-    field: &Field,
-) -> (Vec<usize>, usize) {
-    let player_count = field.players.len();
-    let mut best_perm = Vec::with_capacity(mush_idxs.len());
-    let mut best_perm_cost = best_cost;
-    for perm in mush_idxs.iter().copied().permutations(mush_idxs.len()) {
-        let first_target = perm.first().copied().unwrap_or(player_idx);
-        let mut perm_cost = dist_mat[player_idx][first_target + player_count];
-        for (a, b) in perm.iter().tuple_windows() {
-            perm_cost += dist_mat[*a + player_count][*b + player_count];
-            if perm_cost >= best_perm_cost {
-                break;
+    // for each player, find the minimum spanning tree of their assigned mush sequence
+    for pi in 0..n_plr {
+        if lower_bound >= best_split_cost {
+            return best_split_cost;
+        }
+        let mush_count = split[pi].len();
+        if mush_count == 0 {
+            continue;
+        }
+        let n = mush_count + 1; // size of the matrix
+        // build a extended distance matrix including the players starting position and assigned mushrooms
+        let mut dist_mat = vec![vec![u32::MAX; n]; n];
+        // build the player-to-mush row and column
+        for col in 0..mush_count {
+            let mi = split[pi][col];
+            dist_mat[0][col + 1] = p2m_dist[pi][mi];
+            dist_mat[col + 1][0] = p2m_dist[pi][mi];
+        }
+        // build the mush-to-mush rows and columns
+        for row in 1..n {
+            for col in row..n {
+                let from_mi = split[pi][row - 1];
+                let to_mi = split[pi][col - 1];
+                dist_mat[row][col] = m2m_dist[from_mi][to_mi];
+                dist_mat[col][row] = m2m_dist[from_mi][to_mi];
             }
         }
-        if perm_cost < best_perm_cost {
-            best_perm = perm;
-            best_perm_cost = perm_cost;
+
+        // how much we can increase the cost before it's > best
+        let threshold = best_split_cost - lower_bound;
+        let mst_cost = get_mst_cost(&dist_mat, threshold);
+
+        lower_bound += mst_cost;
+    }
+    return lower_bound;
+}
+
+/// compute the cost of Minimum spanning tree using Prim's algorithm
+///
+/// If the cost becomes larger or equal to threshold, the algorithm
+/// will short-circuit and return the threshold
+#[inline]
+fn get_mst_cost(dist_matrix: &[Vec<u32>], threshold: u32) -> u32 {
+    let n = dist_matrix.len();
+
+    let mut in_mst = vec![false; n];
+    let mut min_edge = vec![u32::MAX; n];
+    min_edge[0] = 0;
+
+    let mut total_cost: u32 = 0;
+
+    for _ in 0..n {
+        // Find vertex with minimal edge
+        let mut u = 0;
+        let mut best = u32::MAX;
+
+        // manual scan, avoid extra branching
+        for v in 0..n {
+            let val = min_edge[v];
+            if !in_mst[v] && val < best {
+                best = val;
+                u = v;
+            }
+        }
+
+        in_mst[u] = true;
+        total_cost += best;
+        if total_cost >= threshold {
+            return threshold;
+        }
+
+        // Update distances to other vertices
+        let row = &dist_matrix[u];
+        for v in 0..n {
+            let d = row[v];
+            if !in_mst[v] && d < min_edge[v] {
+                min_edge[v] = d;
+            }
         }
     }
-    return (best_perm, best_perm_cost);
+
+    return total_cost;
 }
 
-/// produce a greedy split, simply by assigning each mushroom to the nearest player
-#[allow(dead_code)]
-pub fn get_greedy_split(field: &Field, p2m_dist: &[Vec<u32>]) -> Vec<Vec<usize>> {
-    let mut split: Vec<Vec<usize>> = vec![vec![]; field.players.len()];
-    let p2m_dist = transpose(p2m_dist.to_vec());
-    for (mi, _) in field.mushrooms.iter().enumerate() {
-        let nearest_player_idx = p2m_dist[mi].iter().position_min().unwrap();
-        split[nearest_player_idx].push(mi);
-    }
-    return split;
-}
+use std::collections::HashMap;
 
-/// Compute a minimum costs and best sequences for given mushroom-split (for each player)
-/// returns a vector of best_seq mush indexes for each player
 pub fn optimize_split(
     best_cost: u32,
     split: &[Vec<usize>],
     m2m_dist: &[Vec<u32>],
     p2m_dist: &[Vec<u32>],
 ) -> Vec<Vec<usize>> {
-    // for each player, find the best sequence of their mushrooms
-    let optimized_sequences = split
-        .iter()
-        .enumerate()
-        .map(|(player_idx, mush_seq)| -> Vec<usize> {
-            // now find the actual best sequence with better threshold
-            if mush_seq.len() > 1 {
-                return get_best_permutation(mush_seq, player_idx, m2m_dist, p2m_dist);
-            } else {
-                return mush_seq.to_vec();
-            }
-        })
-        .collect_vec();
+    let n_plr = p2m_dist.len();
+    let mut optimized_split = split.to_vec();
 
-    // total cost of this split is sum of the best costs of each player
-    return optimized_sequences;
-}
-
-/// Compute the minimum cost of each mushroom
-pub fn get_mush_min_costs(m2m_dist: &[Vec<u32>], p2m_dist: &[Vec<u32>]) -> Vec<u32> {
-    let mush_count = m2m_dist.len();
-    // create a local copy of the mush-to-mush distance matrix where the diagonal values will be
-    // replaced by usize::MAX so that they are not picked as the minimum value
-    // cloning here is fine, because this function should run only once per map
-    let mut m2m_dist: Vec<Vec<u32>> = m2m_dist.into();
-    (0..m2m_dist.len()).for_each(|i| m2m_dist[i][i] = u32::MAX);
-
-    let p2m_dist = transpose(p2m_dist.to_vec());
-
-    let mut min_costs: Vec<u32> = Vec::with_capacity(mush_count);
-
-    for (idx, row) in m2m_dist.iter().enumerate() {
-        let min_m2m = row.iter().min().unwrap();
-        let min_p2m = p2m_dist[idx].iter().min().unwrap();
-        min_costs.push(std::cmp::min(*min_m2m, *min_p2m));
-    }
-
-    return min_costs;
-}
-
-/// Compute the lower-bound cost of given split
-///
-/// The lower bound is computed as a sum of minimum costs all mushrooms in this split.
-/// This basically assumes that for each mushroom that needs to be picked up, the player is *magically* at the optimal previous location
-pub fn get_split_cost_lower_bound(split: &[Vec<usize>], min_mush_cost: &[u32]) -> u32 {
-    return split
-        .iter()
-        .map(|mushrooms| -> u32 {
-            return mushrooms.iter().map(|m| return min_mush_cost[*m]).sum();
-        })
-        .max() // total cost of the split is given by maximum cost across players
-        .unwrap_or(0);
-}
-
-/// Find the greedy sequence of mushrooms from given player position
-pub fn get_greedy_seq(
-    mush_idxs: &[usize],
-    player_idx: usize,
-    m2m: &[Vec<u32>],
-    p2m: &[Vec<u32>],
-) -> (Vec<usize>, u32) {
-    let mut seq: Vec<usize> = Vec::with_capacity(mush_idxs.len());
-    let used: Vec<bool> = vec![false; mush_idxs.len()];
-    let mut zipped = std::iter::zip(used, mush_idxs).collect_vec();
-    let mut cost: u32 = 0;
-    for _ in 0..mush_idxs.len() {
-        let (pos_to_flip, nearest_mush_idx, nearest_mush_cost) = zipped
-            .iter()
-            .enumerate()
-            .filter_map(|(pos, (used, mush_idx))| {
-                if *used {
-                    return None;
-                }
-                let dist = match seq.last() {
-                    None => p2m[player_idx][**mush_idx],
-                    Some(j) => m2m[*j][**mush_idx],
-                };
-                return Some((pos, mush_idx, dist));
-            })
-            .min_by_key(|x| return x.2)
-            .unwrap();
-        cost += nearest_mush_cost;
-        seq.push(**nearest_mush_idx);
-        zipped[pos_to_flip].0 = true;
-    }
-    return (seq, cost);
-}
-
-/// Compute the best sequence using backtracking
-fn get_best_permutation(
-    mush_idxs: &[usize],
-    player_idx: usize,
-    m2m: &[Vec<u32>],
-    p2m: &[Vec<u32>],
-) -> Vec<usize> {
-    let mut best_perm = mush_idxs.to_vec();
-    let mut best_cost: u32 = best_perm
-        .windows(2)
-        .map(|w| -> u32 { return m2m[w[0]][w[1]] })
-        .sum::<u32>()
-        + p2m[player_idx][mush_idxs[0]];
-    let m2m_flat = m2m.iter().flatten().collect_vec();
-    let p2m_flat = p2m.iter().flatten().collect_vec();
-    // now run the backtracking to actually find the best permutation
-    let mut mush_idxs: Vec<usize> = mush_idxs.to_vec();
-    let n_mush = m2m.len();
-    backtrack(
-        0,
-        0,
-        &mut mush_idxs,
-        &mut best_perm,
-        &mut best_cost,
-        player_idx,
-        &m2m_flat,
-        &p2m_flat,
-        n_mush,
-    );
-    return best_perm;
-}
-
-/// backtracking algorithm to find best permutation
-#[allow(clippy::too_many_arguments)]
-fn backtrack(
-    index: usize,
-    current_cost: u32,
-    numbers: &mut Vec<usize>,
-    best_perm: &mut Vec<usize>,
-    best_cost: &mut u32,
-    player_idx: usize,
-    m2m_flat: &[&u32],
-    p2m_flat: &[&u32],
-    n_mush: usize,
-) {
-    if index == numbers.len() {
-        let from = numbers[index - 1]; // x coord
-        let to = numbers[index - 2]; // y coord
-        // let total_cost = current_cost + m2m_flat[from][to];
-        let total_cost = current_cost + m2m_flat[from * n_mush + to];
-        if total_cost < *best_cost {
-            *best_cost = total_cost;
-            // best_perm[..numbers.len()].copy_from_slice(numbers);
-            *best_perm = numbers.clone();
+    for pi in 0..n_plr {
+        let mushrooms = &split[pi];
+        let n_mush = mushrooms.len();
+        if n_mush < 2 {
+            continue;
         }
-        return;
-    }
 
-    for i in index..numbers.len() {
-        numbers.swap(index, i);
-        let added_cost = match index {
-            0 => 0, // no elements => no cost
-            1 => {
-                // one elements => distance from player to first mush
-                // p2m_flat[player_idx][numbers[0]]
-                *p2m_flat[player_idx * n_mush + numbers[0]]
+        let mut best_seq = mushrooms.clone();
+        let mut best_seq_cost = best_cost;
+        let mut path = vec![0usize; n_mush];
+
+        // MST cache
+        let mut mst_cache: HashMap<u64, u32> = HashMap::new();
+
+        // preallocated MST scratch
+        let mut nodes = vec![0usize; n_mush];
+        let mut in_mst = vec![false; n_mush];
+        let mut min_edge = vec![u32::MAX; n_mush];
+
+        // preallocated candidates buffer
+        let mut candidates = Vec::with_capacity(n_mush);
+
+        #[inline(always)]
+        fn compute_mst(
+            mask: u64,
+            n_mush: usize,
+            mushrooms: &[usize],
+            m2m_dist: &[Vec<u32>],
+            cache: &mut HashMap<u64, u32>,
+            nodes: &mut [usize],
+            in_mst: &mut [bool],
+            min_edge: &mut [u32],
+        ) -> u32 {
+            if mask == 0 {
+                return 0;
             }
-            _ => {
-                // multiple elements => cost is the last step mush-to-mush
-                let last = numbers[index - 1];
-                let second_last = numbers[index - 2];
-                // m2m_flat[second_last][last]
-                *m2m_flat[second_last * n_mush + last]
+            if let Some(&v) = cache.get(&mask) {
+                return v;
             }
-        };
-        let new_cost = current_cost + added_cost;
-        if new_cost < *best_cost {
-            backtrack(
-                index + 1,
-                new_cost,
-                numbers,
-                best_perm,
-                best_cost,
-                player_idx,
-                m2m_flat,
-                p2m_flat,
+
+            let mut k = 0;
+            for i in 0..n_mush {
+                if (mask >> i) & 1 != 0 {
+                    nodes[k] = i;
+                    k += 1;
+                }
+            }
+
+            for i in 0..k {
+                in_mst[i] = false;
+                min_edge[i] = u32::MAX;
+            }
+
+            in_mst[0] = true;
+            let a = mushrooms[nodes[0]];
+            for j in 1..k {
+                let b = mushrooms[nodes[j]];
+                min_edge[j] = m2m_dist[a][b];
+            }
+
+            let mut total = 0u32;
+            for _ in 1..k {
+                let mut best_j = usize::MAX;
+                let mut best_cost = u32::MAX;
+                for j in 0..k {
+                    if !in_mst[j] && min_edge[j] < best_cost {
+                        best_cost = min_edge[j];
+                        best_j = j;
+                    }
+                }
+                if best_j == usize::MAX {
+                    break;
+                }
+                total += best_cost;
+                in_mst[best_j] = true;
+
+                let u_global = mushrooms[nodes[best_j]];
+                for v in 0..k {
+                    if !in_mst[v] {
+                        let v_global = mushrooms[nodes[v]];
+                        let duv = m2m_dist[u_global][v_global];
+                        if duv < min_edge[v] {
+                            min_edge[v] = duv;
+                        }
+                    }
+                }
+            }
+
+            cache.insert(mask, total);
+            total
+        }
+
+        #[inline(always)]
+        fn dfs(
+            depth: usize,
+            last_idx: usize,
+            cost: u32,
+            visited_mask: u64,
+            n_mush: usize,
+            mushrooms: &[usize],
+            m2m_dist: &[Vec<u32>],
+            path: &mut [usize],
+            best_seq: &mut [usize],
+            best_seq_cost: &mut u32,
+            mst_cache: &mut HashMap<u64, u32>,
+            nodes: &mut [usize],
+            in_mst: &mut [bool],
+            min_edge: &mut [u32],
+            candidates: &mut Vec<(u32, usize)>,
+        ) {
+            let full_mask = if n_mush >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << n_mush) - 1
+            };
+            let rem_mask = full_mask & !visited_mask;
+
+            if rem_mask == 0 {
+                if cost < *best_seq_cost {
+                    *best_seq_cost = cost;
+                    best_seq.copy_from_slice(path);
+                }
+                return;
+            }
+
+            let mst_cost = compute_mst(
+                rem_mask, n_mush, mushrooms, m2m_dist, mst_cache, nodes, in_mst, min_edge,
+            );
+
+            let last_mush = mushrooms[last_idx];
+            let mut min_from_last = u32::MAX;
+
+            candidates.clear();
+            let mut bit = rem_mask;
+            while bit != 0 {
+                let tz = bit.trailing_zeros() as usize;
+                let next_idx = tz;
+                let next_mush = mushrooms[next_idx];
+                let e = m2m_dist[last_mush][next_mush];
+                candidates.push((e, next_idx));
+                if e < min_from_last {
+                    min_from_last = e;
+                }
+                bit &= bit - 1;
+            }
+
+            let lower_bound = cost.saturating_add(mst_cost).saturating_add(min_from_last);
+            if lower_bound >= *best_seq_cost {
+                return;
+            }
+
+            candidates.sort_unstable_by_key(|&(e, _)| e);
+
+            // snapshot to avoid mutation conflicts
+            let snapshot: Vec<(u32, usize)> = candidates.clone();
+
+            for (edge_cost, next_idx) in snapshot {
+                let new_cost = cost.saturating_add(edge_cost);
+                if new_cost >= *best_seq_cost {
+                    continue;
+                }
+                let next_mush = mushrooms[next_idx];
+                path[depth] = next_mush;
+                dfs(
+                    depth + 1,
+                    next_idx,
+                    new_cost,
+                    visited_mask | (1u64 << next_idx),
+                    n_mush,
+                    mushrooms,
+                    m2m_dist,
+                    path,
+                    best_seq,
+                    best_seq_cost,
+                    mst_cache,
+                    nodes,
+                    in_mst,
+                    min_edge,
+                    candidates,
+                );
+            }
+        }
+
+        for (idx, &mush) in mushrooms.iter().enumerate() {
+            path[0] = mush;
+            let start_cost = p2m_dist[pi][mush];
+            if start_cost >= best_seq_cost {
+                continue;
+            }
+            dfs(
+                1,
+                idx,
+                start_cost,
+                1u64 << idx,
                 n_mush,
+                mushrooms,
+                m2m_dist,
+                &mut path,
+                &mut best_seq,
+                &mut best_seq_cost,
+                &mut mst_cache,
+                &mut nodes,
+                &mut in_mst,
+                &mut min_edge,
+                &mut candidates,
             );
         }
-        numbers.swap(index, i); // undo swap (backtracking)
+
+        optimized_split[pi].copy_from_slice(&best_seq);
     }
+
+    optimized_split
+}
+/// Compute a minimum costs and best sequences for given mushroom-split (for each player)
+/// returns a vector of best_seq mush indexes for each player
+///
+/// If the cost reaches best_cost, the algorithm will short-circuit and returns empty vector
+pub fn optimize_split_old2(
+    best_cost: u32,
+    split: &[Vec<usize>],
+    m2m_dist: &[Vec<u32>],
+    p2m_dist: &[Vec<u32>],
+) -> Vec<Vec<usize>> {
+    let n_plr = p2m_dist.len();
+    let mut optimized_split = split.to_vec();
+
+    for pi in 0..n_plr {
+        let mushrooms = &split[pi];
+        let n_mush = mushrooms.len();
+        if n_mush < 2 {
+            continue;
+        }
+
+        // best sequence (global mushroom indices) and its cost (initialized to cutoff)
+        let mut best_seq = mushrooms.clone();
+        let mut best_seq_cost = best_cost;
+
+        // current path (global mushroom indices)
+        let mut path = vec![0usize; n_mush];
+
+        // cache for MST costs keyed by bitmask of remaining nodes
+        let mut mst_cache: HashMap<u64, u32> = HashMap::new();
+
+        #[inline(always)]
+        fn compute_mst(
+            mask: u64,
+            n_mush: usize,
+            mushrooms: &[usize],
+            m2m_dist: &[Vec<u32>],
+            cache: &mut HashMap<u64, u32>,
+        ) -> u32 {
+            if mask == 0 {
+                return 0;
+            }
+            if let Some(&v) = cache.get(&mask) {
+                return v;
+            }
+
+            // collect node indices (indices into `mushrooms` slice)
+            let mut nodes = Vec::with_capacity(mask.count_ones() as usize);
+            for i in 0..n_mush {
+                if (mask >> i) & 1 != 0 {
+                    nodes.push(i);
+                }
+            }
+
+            let k = nodes.len();
+            debug_assert!(k > 0);
+
+            // Prim's algorithm on the induced subgraph of `nodes`
+            let mut in_mst = vec![false; k];
+            let mut min_edge = vec![u32::MAX; k];
+
+            // pick first as starting point
+            in_mst[0] = true;
+            for j in 1..k {
+                let a = mushrooms[nodes[0]];
+                let b = mushrooms[nodes[j]];
+                min_edge[j] = m2m_dist[a][b];
+            }
+
+            let mut total = 0u32;
+            for _ in 1..k {
+                // find cheapest edge to add
+                let mut best_j = None;
+                let mut best_cost = u32::MAX;
+                for j in 0..k {
+                    if !in_mst[j] && min_edge[j] < best_cost {
+                        best_cost = min_edge[j];
+                        best_j = Some(j);
+                    }
+                }
+                let u = best_j.expect("there must be a next MST node");
+                // add and update
+                total = total.saturating_add(best_cost);
+                in_mst[u] = true;
+
+                let u_global = mushrooms[nodes[u]];
+                for v in 0..k {
+                    if !in_mst[v] {
+                        let v_global = mushrooms[nodes[v]];
+                        let duv = m2m_dist[u_global][v_global];
+                        if duv < min_edge[v] {
+                            min_edge[v] = duv;
+                        }
+                    }
+                }
+            }
+
+            cache.insert(mask, total);
+            total
+        }
+
+        #[inline(always)]
+        fn dfs(
+            depth: usize,
+            last_idx: usize,
+            cost: u32,
+            visited_mask: u64,
+            n_mush: usize,
+            mushrooms: &[usize],
+            m2m_dist: &[Vec<u32>],
+            path: &mut [usize],
+            best_seq: &mut [usize],
+            best_seq_cost: &mut u32,
+            mst_cache: &mut HashMap<u64, u32>,
+        ) {
+            // full_mask for n_mush bits
+            let full_mask = if n_mush >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << n_mush) - 1
+            };
+            let rem_mask = full_mask & !visited_mask;
+
+            // finished
+            if rem_mask == 0 {
+                if cost < *best_seq_cost {
+                    *best_seq_cost = cost;
+                    best_seq.copy_from_slice(path);
+                }
+                return;
+            }
+
+            // MST lower bound on remaining nodes
+            let mst_cost = compute_mst(rem_mask, n_mush, mushrooms, m2m_dist, mst_cache);
+
+            // min edge from last node into remaining nodes
+            let last_mush = mushrooms[last_idx];
+            let mut min_from_last = u32::MAX;
+
+            // collect candidates (edge_cost, next_idx) to explore promising ones first
+            let mut candidates: Vec<(u32, usize)> = Vec::new();
+            let mut bit = rem_mask;
+            while bit != 0 {
+                let tz = bit.trailing_zeros() as usize;
+                let next_idx = tz;
+                let next_mush = mushrooms[next_idx];
+                let e = m2m_dist[last_mush][next_mush];
+                candidates.push((e, next_idx));
+                if e < min_from_last {
+                    min_from_last = e;
+                }
+                bit &= bit - 1;
+            }
+
+            // admissible LB: must at least add an edge from last to the remaining cluster + MST among them
+            let lower_bound = cost.saturating_add(mst_cost).saturating_add(min_from_last);
+            if lower_bound >= *best_seq_cost {
+                return;
+            }
+
+            // explore cheaper edges first
+            candidates.sort_unstable_by_key(|&(e, _)| e);
+
+            for (edge_cost, next_idx) in candidates {
+                let new_cost = cost.saturating_add(edge_cost);
+                if new_cost >= *best_seq_cost {
+                    continue;
+                }
+                let next_mush = mushrooms[next_idx];
+                path[depth] = next_mush;
+                dfs(
+                    depth + 1,
+                    next_idx,
+                    new_cost,
+                    visited_mask | (1u64 << next_idx),
+                    n_mush,
+                    mushrooms,
+                    m2m_dist,
+                    path,
+                    best_seq,
+                    best_seq_cost,
+                    mst_cache,
+                );
+            }
+        }
+
+        // initialize dfs for each possible starting mushroom
+        for (idx, &mush) in mushrooms.iter().enumerate() {
+            path[0] = mush;
+            let start_cost = p2m_dist[pi][mush];
+            if start_cost >= best_seq_cost {
+                // pruning: start already worse than best known
+                continue;
+            }
+            dfs(
+                1,
+                idx,
+                start_cost,
+                1u64 << idx,
+                n_mush,
+                mushrooms,
+                m2m_dist,
+                &mut path,
+                &mut best_seq,
+                &mut best_seq_cost,
+                &mut mst_cache,
+            );
+        }
+
+        // write best sequence back (keeps original order if no better solution found)
+        optimized_split[pi].copy_from_slice(&best_seq);
+    }
+
+    optimized_split
 }
 
+/// Compute a minimum costs and best sequences for given mushroom-split (for each player)
+/// returns a vector of best_seq mush indexes for each player
+///
+/// If the cost reaches best_cost, the algorithm will short-circuit and returns empty vector
+pub fn optimize_split_old(
+    best_cost: u32,
+    split: &[Vec<usize>],
+    m2m_dist: &[Vec<u32>],
+    p2m_dist: &[Vec<u32>],
+) -> Vec<Vec<usize>> {
+    let n_plr = p2m_dist.len();
+    let mut optimized_split = split.to_vec();
+
+    for pi in 0..n_plr {
+        let mushrooms = &split[pi];
+        let n_mush = mushrooms.len();
+        if n_mush < 2 {
+            continue;
+        }
+
+        let mut best_seq = mushrooms.clone();
+        let mut best_seq_cost = best_cost;
+
+        let mut path = vec![0usize; n_mush];
+
+        #[allow(clippy::too_many_arguments)]
+        fn dfs(
+            depth: usize,
+            last_idx: usize,
+            cost: u32,
+            visited_mask: u64,
+            mushrooms: &[usize],
+            m2m_dist: &[Vec<u32>],
+            path: &mut [usize],
+            best_seq: &mut [usize],
+            best_seq_cost: &mut u32,
+        ) {
+            let n_mush = mushrooms.len();
+            if depth == n_mush {
+                if cost < *best_seq_cost {
+                    *best_seq_cost = cost;
+                    best_seq.copy_from_slice(path);
+                }
+                return;
+            }
+
+            for next_idx in 0..n_mush {
+                if visited_mask & (1 << next_idx) != 0 {
+                    continue;
+                }
+
+                let next_mush = mushrooms[next_idx];
+                let last_mush = mushrooms[last_idx];
+                let new_cost = cost + m2m_dist[last_mush][next_mush];
+
+                if new_cost >= *best_seq_cost {
+                    continue;
+                }
+
+                path[depth] = next_mush;
+                dfs(
+                    depth + 1,
+                    next_idx,
+                    new_cost,
+                    visited_mask | (1 << next_idx),
+                    mushrooms,
+                    m2m_dist,
+                    path,
+                    best_seq,
+                    best_seq_cost,
+                );
+            }
+        }
+
+        // initialize dfs for each starting mushroom
+        for (idx, &mush) in mushrooms.iter().enumerate() {
+            path[0] = mush;
+            dfs(
+                1,
+                idx,
+                p2m_dist[pi][mush],
+                1 << idx,
+                mushrooms,
+                m2m_dist,
+                &mut path,
+                &mut best_seq,
+                &mut best_seq_cost,
+            );
+        }
+
+        optimized_split[pi].copy_from_slice(&best_seq);
+    }
+
+    return optimized_split;
+}
+
+/// returns the cost of given split
 fn get_split_cost(split: &[Vec<usize>], m2m_dist: &[Vec<u32>], p2m_dist: &[Vec<u32>]) -> u32 {
     return split
         .iter()

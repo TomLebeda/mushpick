@@ -192,41 +192,7 @@ fn generate_maze(size: usize, target_wall_count: i32) -> Vec<Vec<bool>> {
         }
     }
 
-    // Recursive backtracking to carve paths
-    #[allow(dead_code)]
-    fn carve_path_recursive(
-        grid: &mut Vec<Vec<bool>>,
-        x: usize,
-        y: usize,
-        size: usize,
-        rng: &mut ThreadRng,
-    ) {
-        grid[y][x] = true; // Mark the current cell as part of the path
-
-        // Directions shuffled for randomness
-        let mut directions = [(1, 0), (0, 1), (-1, 0), (0, -1)];
-        directions.shuffle(rng);
-
-        // Try all directions
-        for (dx, dy) in directions.iter() {
-            let nx = (x as isize + dx) as usize;
-            let ny = (y as isize + dy) as usize;
-
-            // Check if the neighbor is within bounds and is a wall
-            if in_bounds(nx as isize, ny as isize, size) && !grid[ny][nx] {
-                let neighbor_count = count_neighbors(grid, nx, ny);
-
-                // Only carve a path if the cell has exactly 1 neighboring path
-                if neighbor_count == 1 {
-                    grid[ny][nx] = true; // Mark the cell as a path
-                    carve_path_recursive(grid, nx, ny, size, rng); // Recur to continue carving
-                }
-            }
-        }
-    }
-
     // Start from a random position (1,1) avoiding outer walls
-    // carve_path_recursive(&mut grid, 1, 1, size, &mut rng);
     carve_path(target_wall_count, &mut grid, 1, 1, size, &mut rng);
 
     return grid;

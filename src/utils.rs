@@ -13,27 +13,6 @@ pub enum Direction {
     Right,
 }
 
-// transpose NxM matrix into MxN matrix
-pub fn transpose<T: Clone>(matrix: Vec<Vec<T>>) -> Vec<Vec<T>> {
-    if matrix.is_empty() {
-        return vec![];
-    }
-
-    let rows = matrix.len();
-    let cols = matrix[0].len();
-
-    let mut transposed = vec![vec![matrix[0][0].clone(); rows]; cols];
-
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..rows {
-        for j in 0..cols {
-            transposed[j][i] = matrix[i][j].clone();
-        }
-    }
-
-    return transposed;
-}
-
 impl Display for Direction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
