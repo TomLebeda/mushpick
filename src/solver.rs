@@ -59,7 +59,6 @@ pub fn solve(map_file: PathBuf, fast: bool) {
                 .collect_vec();
         })
         .collect_vec();
-    trace!(" - found m2m dist");
 
     let p2m_paths = bfs_p2m(&field);
     let p2m_dist = p2m_paths
@@ -71,7 +70,6 @@ pub fn solve(map_file: PathBuf, fast: bool) {
                 .collect_vec();
         })
         .collect_vec();
-    trace!(" - found p2m dist");
 
     // how the players split the mushrooms
     let mut greedy_split: Vec<Vec<usize>> = vec![Vec::with_capacity(n_mush); n_plr];
@@ -126,14 +124,6 @@ pub fn solve(map_file: PathBuf, fast: bool) {
     }
 
     let greedy_split_cost = get_split_cost(&greedy_split, &m2m_dist, &p2m_dist);
-
-    greedy_split
-        .iter()
-        .enumerate()
-        .for_each(|(p_idx, mush_seq)| {
-            trace!("   - P{}: {:?}", p_idx, mush_seq);
-        });
-
     let optimized_greedy_split =
         optimize_split(greedy_split_cost, &greedy_split, &m2m_dist, &p2m_dist);
     let optimized_greedy_split_cost = get_split_cost(&optimized_greedy_split, &m2m_dist, &p2m_dist);
