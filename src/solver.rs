@@ -71,72 +71,36 @@ pub fn solve(map_file: PathBuf, fast: bool) {
         })
         .collect_vec();
 
-    // how the players split the mushrooms
-    let mut greedy_split: Vec<Vec<usize>> = vec![Vec::with_capacity(n_mush); n_plr];
-    // movement-potential for each player
-    let mut free_steps: Vec<u32> = vec![0; n_plr];
-    // indicator if mushroom at index is assigned
-    let mut mushrooms_free = vec![true; n_mush];
-    // vector of (player_index, nearest_mush_idx, nearest_mush_dist, ticks_required)
-    let mut nearest: [(_, _, _, _); MAX_PLAYERS] = [(0, 0, u32::MAX, 0); MAX_PLAYERS];
-
-    // while there are still some mushrooms left to be assigned...
-    while mushrooms_free.iter().any(|&free| return free) {
-        // how many ticks are required to pick up next mushroom (by anyone)
-        let mut min_ticks = u32::MAX;
-        // find how many ticks are required for any player to pick any (nearest) mushroom
-        for pi in 0..n_plr {
-            let dist_row = match greedy_split[pi].last() {
-                Some(pos) => &m2m_dist[*pos], // player is already standing on a mushroom
-                None => &p2m_dist[pi],        // player hasn't moved yet
-            };
-            let mut nearest_mush_idx = 0;
-            let mut nearest_mush_dist = u32::MAX;
-            // find nearest free mushroom for current player
-            for mi in 0..mushrooms_free.len() {
-                // branch-less checking if mushroom is free: mask = 1 if free, 0 if not
-                let mask = mushrooms_free[mi] as u32;
-                let dist = dist_row[mi];
-                let use_dist = dist * mask + (1 - mask) * u32::MAX;
-                if use_dist < nearest_mush_dist {
-                    nearest_mush_idx = mi;
-                    nearest_mush_dist = use_dist;
-                }
-            }
-            let ticks_required = nearest_mush_dist - free_steps[pi];
-            nearest[pi] = (pi, nearest_mush_idx, nearest_mush_dist, ticks_required);
-            min_ticks = min_ticks.min(ticks_required);
-        }
-
-        // increment free ticks for all players
-        for val in &mut free_steps[0..n_plr] {
-            *val += min_ticks;
-        }
-
-        // check all players if they have enough free ticks to pick up some mushrooms
-        for &(pi, nearest_mush_idx, nearest_mush_dist, _ticks_required) in &nearest[0..n_plr] {
-            if free_steps[pi] >= nearest_mush_dist {
-                free_steps[pi] -= nearest_mush_dist; // subtract the used steps
-                greedy_split[pi].push(nearest_mush_idx); // push the mushroom into the split
-                mushrooms_free[nearest_mush_idx] = false; // mark the mushroom as assigned
-            }
-        }
-    }
-
+    // I have two ways to get fast and pretty good splits
+    let greedy_split = get_greedy_split(&m2m_dist, &p2m_dist);
     let greedy_split_cost = get_split_cost(&greedy_split, &m2m_dist, &p2m_dist);
     let optimized_greedy_split =
         optimize_split(greedy_split_cost, &greedy_split, &m2m_dist, &p2m_dist);
     let optimized_greedy_split_cost = get_split_cost(&optimized_greedy_split, &m2m_dist, &p2m_dist);
 
-    optimized_greedy_split
-        .iter()
-        .enumerate()
-        .for_each(|(p_idx, mush_seq)| {
-            trace!("   - P{}: {:?}", p_idx, mush_seq);
-        });
+    let lookahead_split = get_lookahead_split(&m2m_dist, &p2m_dist);
+    let lookahead_split_cost = get_split_cost(&lookahead_split, &m2m_dist, &p2m_dist);
+    let optimized_lookahead_split = optimize_split(
+        optimized_greedy_split_cost.min(lookahead_split_cost),
+        &lookahead_split,
+        &m2m_dist,
+        &p2m_dist,
+    );
+    let optimized_lookahead_split_cost =
+        get_split_cost(&optimized_lookahead_split, &m2m_dist, &p2m_dist);
 
-    let mut best_split_cost = optimized_greedy_split_cost;
-    let mut best_split = optimized_greedy_split;
+    let mut best_split_cost: u32;
+    let mut best_split: Vec<Vec<usize>>;
+
+    if optimized_lookahead_split_cost < optimized_greedy_split_cost {
+        trace!("using lookahead split (optimized), cost: {optimized_lookahead_split_cost}");
+        best_split_cost = optimized_lookahead_split_cost;
+        best_split = optimized_lookahead_split;
+    } else {
+        trace!("using greedy split (optimized), cost: {optimized_greedy_split_cost}");
+        best_split_cost = optimized_greedy_split_cost;
+        best_split = optimized_greedy_split;
+    }
 
     if !fast {
         // keep the lower bound outside of loop and mutable so we can early-stop while still building it
@@ -547,4 +511,110 @@ fn get_split_cost(split: &[Vec<usize>], m2m_dist: &[Vec<u32>], p2m_dist: &[Vec<u
                 + p2m_dist[player_idx][mush_seq[0]];
         })
         .sum();
+}
+
+/// Compute a greedy split of mushrooms between players
+fn get_greedy_split(
+    m2m_dist: &[Vec<u32>], // [mushroom][mushroom]
+    p2m_dist: &[Vec<u32>], // [player][mushroom]
+) -> Vec<Vec<usize>> {
+    let n_plr = p2m_dist.len();
+    let n_mush = m2m_dist.len();
+
+    let mut split: Vec<Vec<usize>> = vec![Vec::with_capacity(n_mush); n_plr];
+    let mut mushrooms_free: Vec<bool> = vec![true; n_mush];
+
+    loop {
+        let mut best: Option<(usize, usize, u32)> = None;
+
+        // Find globally closest (player, mushroom) pair
+        for pi in 0..n_plr {
+            for mi in 0..n_mush {
+                if !mushrooms_free[mi] {
+                    continue;
+                }
+
+                let dist = match split[pi].last() {
+                    Some(last_mi) => m2m_dist[*last_mi][mi], // from last mushroom
+                    None => p2m_dist[pi][mi],                // from starting position
+                };
+
+                if dist < u32::MAX && (best.is_none() || dist < best.unwrap().2) {
+                    best = Some((pi, mi, dist));
+                }
+            }
+        }
+
+        // Stop if no reachable mushrooms remain
+        let (pi, mi, _dist) = match best {
+            Some(t) => t,
+            None => break,
+        };
+
+        // Assign mushroom to player
+        split[pi].push(mi);
+        mushrooms_free[mi] = false;
+    }
+
+    return split;
+}
+
+fn get_lookahead_split(
+    m2m_dist: &[Vec<u32>], // [mushroom][mushroom]
+    p2m_dist: &[Vec<u32>], // [player][mushroom]
+) -> Vec<Vec<usize>> {
+    let n_plr = p2m_dist.len();
+    let n_mush = m2m_dist.len();
+    // how the players split the mushrooms
+    let mut greedy_split: Vec<Vec<usize>> = vec![Vec::with_capacity(n_mush); n_plr];
+    // movement-potential for each player
+    let mut free_steps: Vec<u32> = vec![0; n_plr];
+    // indicator if mushroom at index is assigned
+    let mut mushrooms_free = vec![true; n_mush];
+    // vector of (player_index, nearest_mush_idx, nearest_mush_dist, ticks_required)
+    let mut nearest: [(_, _, _, _); MAX_PLAYERS] = [(0, 0, u32::MAX, 0); MAX_PLAYERS];
+
+    // while there are still some mushrooms left to be assigned...
+    while mushrooms_free.iter().any(|&free| return free) {
+        // how many ticks are required to pick up next mushroom (by anyone)
+        let mut min_ticks = u32::MAX;
+        // find how many ticks are required for any player to pick any (nearest) mushroom
+        for pi in 0..n_plr {
+            let dist_row = match greedy_split[pi].last() {
+                Some(pos) => &m2m_dist[*pos], // player is already standing on a mushroom
+                None => &p2m_dist[pi],        // player hasn't moved yet
+            };
+            let mut nearest_mush_idx = 0;
+            let mut nearest_mush_dist = u32::MAX;
+            // find nearest free mushroom for current player
+            for mi in 0..mushrooms_free.len() {
+                // branch-less checking if mushroom is free: mask = 1 if free, 0 if not
+                let mask = mushrooms_free[mi] as u32;
+                let dist = dist_row[mi];
+                let use_dist = dist * mask + (1 - mask) * u32::MAX;
+                if use_dist < nearest_mush_dist {
+                    nearest_mush_idx = mi;
+                    nearest_mush_dist = use_dist;
+                }
+            }
+            let ticks_required = nearest_mush_dist - free_steps[pi];
+            nearest[pi] = (pi, nearest_mush_idx, nearest_mush_dist, ticks_required);
+            min_ticks = min_ticks.min(ticks_required);
+        }
+
+        // increment free ticks for all players
+        for val in &mut free_steps[0..n_plr] {
+            *val += min_ticks;
+        }
+
+        // check all players if they have enough free ticks to pick up some mushrooms
+        for &(pi, nearest_mush_idx, nearest_mush_dist, _ticks_required) in &nearest[0..n_plr] {
+            if free_steps[pi] >= nearest_mush_dist {
+                free_steps[pi] -= nearest_mush_dist; // subtract the used steps
+                greedy_split[pi].push(nearest_mush_idx); // push the mushroom into the split
+                mushrooms_free[nearest_mush_idx] = false; // mark the mushroom as assigned
+            }
+        }
+    }
+    return greedy_split;
 }
