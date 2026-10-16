@@ -609,7 +609,8 @@ fn get_lookahead_split(
 
         // check all players if they have enough free ticks to pick up some mushrooms
         for &(pi, nearest_mush_idx, nearest_mush_dist, _ticks_required) in &nearest[0..n_plr] {
-            if free_steps[pi] >= nearest_mush_dist {
+            // another player may have taken the same mushroom in this tick
+            if free_steps[pi] >= nearest_mush_dist && mushrooms_free[nearest_mush_idx] {
                 free_steps[pi] -= nearest_mush_dist; // subtract the used steps
                 greedy_split[pi].push(nearest_mush_idx); // push the mushroom into the split
                 mushrooms_free[nearest_mush_idx] = false; // mark the mushroom as assigned
@@ -617,4 +618,185 @@ fn get_lookahead_split(
         }
     }
     return greedy_split;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::generator::generate_field;
+    use crate::utils::Field;
+    use crate::utils::tests::field;
+
+    /// Distance matrices in the same form as `solve` builds them
+    fn dist_matrices(f: &Field) -> (Vec<Vec<u32>>, Vec<Vec<u32>>) {
+        let m2m = bfs_m2m(f)
+            .iter()
+            .enumerate()
+            .map(|(i, row)| {
+                return row
+                    .iter()
+                    .enumerate()
+                    .map(|(j, p)| return if i == j { u32::MAX } else { p.len() as u32 })
+                    .collect_vec();
+            })
+            .collect_vec();
+        let p2m = bfs_p2m(f)
+            .iter()
+            .map(|row| return row.iter().map(|p| return p.len() as u32).collect_vec())
+            .collect_vec();
+        return (m2m, p2m);
+    }
+
+    /// Cost of one player's best order, by trying all permutations
+    fn brute_force_seq(pi: usize, mush: &[usize], m2m: &[Vec<u32>], p2m: &[Vec<u32>]) -> u32 {
+        if mush.is_empty() {
+            return 0;
+        }
+        return mush
+            .iter()
+            .copied()
+            .permutations(mush.len())
+            .map(|seq| return get_split_cost_single(pi, &seq, m2m, p2m))
+            .min()
+            .unwrap();
+    }
+
+    fn get_split_cost_single(pi: usize, seq: &[usize], m2m: &[Vec<u32>], p2m: &[Vec<u32>]) -> u32 {
+        let mut split = vec![vec![]; p2m.len()];
+        split[pi] = seq.to_vec();
+        return get_split_cost(&split, m2m, p2m);
+    }
+
+    /// Optimal total cost over all assignments and orders
+    fn brute_force_optimum(m2m: &[Vec<u32>], p2m: &[Vec<u32>]) -> u32 {
+        let (n_plr, n_mush) = (p2m.len(), m2m.len());
+        let mut best = u32::MAX;
+        for assignment in (0..n_mush)
+            .map(|_| return 0..n_plr)
+            .multi_cartesian_product()
+        {
+            let mut split = vec![vec![]; n_plr];
+            for (mi, pi) in assignment.iter().enumerate() {
+                split[*pi].push(mi);
+            }
+            let cost = (0..n_plr)
+                .map(|pi| return brute_force_seq(pi, &split[pi], m2m, p2m))
+                .sum();
+            best = best.min(cost);
+        }
+        return best;
+    }
+
+    /// Every mushroom index appears exactly once in the split
+    #[track_caller]
+    fn assert_complete_split(split: &[Vec<usize>], n_plr: usize, n_mush: usize) {
+        assert_eq!(split.len(), n_plr);
+        let mut all = split.concat();
+        all.sort_unstable();
+        assert_eq!(all, (0..n_mush).collect_vec());
+    }
+
+    #[test]
+    fn split_cost_hand_computed() {
+        // P M - M
+        // - - - -
+        // - - - -
+        // M - - P
+        let f = field("P M - M\n- - - -\n- - - -\nM - - P\n");
+        let (m2m, p2m) = dist_matrices(&f);
+        // P0 -> M0 (1) -> M1 (2), P1 -> M2 (3)
+        assert_eq!(
+            get_split_cost(&[vec![0, 1], vec![2]], &m2m, &p2m),
+            1 + 2 + 3
+        );
+        // empty players cost nothing
+        assert_eq!(get_split_cost(&[vec![], vec![2]], &m2m, &p2m), 3);
+        assert_eq!(get_split_cost(&[vec![], vec![]], &m2m, &p2m), 0);
+    }
+
+    #[test]
+    fn mst_cost_known_graph() {
+        let x = u32::MAX;
+        // path graph 0-1-2-3 with weights 1, 2, 3 plus expensive shortcuts
+        let mat = vec![
+            vec![x, 1, 10, 10],
+            vec![1, x, 2, 10],
+            vec![10, 2, x, 3],
+            vec![10, 10, 3, x],
+        ];
+        assert_eq!(get_mst_cost(&mat, u32::MAX), 6);
+        // early stop returns the threshold
+        assert_eq!(get_mst_cost(&mat, 4), 4);
+    }
+
+    #[test]
+    fn heuristic_splits_assign_every_mushroom_once() {
+        for _ in 0..20 {
+            let f = generate_field(10, 30, 3, 8).unwrap();
+            let (m2m, p2m) = dist_matrices(&f);
+            let greedy = get_greedy_split(&m2m, &p2m);
+            assert_complete_split(&greedy, 3, 8);
+            let lookahead = get_lookahead_split(&m2m, &p2m);
+            assert_complete_split(&lookahead, 3, 8);
+        }
+    }
+
+    #[test]
+    fn optimize_split_finds_best_order_per_player() {
+        for _ in 0..20 {
+            let f = generate_field(8, 20, 2, 6).unwrap();
+            let (m2m, p2m) = dist_matrices(&f);
+            let split = get_greedy_split(&m2m, &p2m);
+            let cost = get_split_cost(&split, &m2m, &p2m);
+
+            let optimized = optimize_split(u32::MAX, &split, &m2m, &p2m);
+            // same mushrooms per player, only reordered
+            for (a, b) in split.iter().zip(&optimized) {
+                assert_eq!(
+                    a.iter().sorted().collect_vec(),
+                    b.iter().sorted().collect_vec()
+                );
+            }
+            let optimized_cost = get_split_cost(&optimized, &m2m, &p2m);
+            assert!(optimized_cost <= cost);
+            let expected: u32 = (0..2)
+                .map(|pi| return brute_force_seq(pi, &split[pi], &m2m, &p2m))
+                .sum();
+            assert_eq!(optimized_cost, expected);
+        }
+    }
+
+    #[test]
+    fn lower_bound_never_exceeds_optimal_split_cost() {
+        for _ in 0..20 {
+            let f = generate_field(8, 20, 2, 6).unwrap();
+            let (m2m, p2m) = dist_matrices(&f);
+            for split in [
+                get_greedy_split(&m2m, &p2m),
+                get_lookahead_split(&m2m, &p2m),
+            ] {
+                let optimal: u32 = (0..2)
+                    .map(|pi| return brute_force_seq(pi, &split[pi], &m2m, &p2m))
+                    .sum();
+                let lb = get_split_cost_lower_bound_mst(&split, &m2m, &p2m, 2, u32::MAX);
+                assert!(lb <= optimal, "lower bound {lb} > optimal {optimal}");
+            }
+        }
+    }
+
+    #[test]
+    fn heuristics_are_not_better_than_brute_force() {
+        for _ in 0..10 {
+            let f = generate_field(7, 15, 2, 5).unwrap();
+            let (m2m, p2m) = dist_matrices(&f);
+            let best = brute_force_optimum(&m2m, &p2m);
+            for split in [
+                get_greedy_split(&m2m, &p2m),
+                get_lookahead_split(&m2m, &p2m),
+            ] {
+                let optimized = optimize_split(u32::MAX, &split, &m2m, &p2m);
+                assert!(get_split_cost(&optimized, &m2m, &p2m) >= best);
+            }
+        }
+    }
 }
