@@ -28,39 +28,37 @@ pub fn generate_field(
     let wall_count = map.iter().filter(|b| return !(**b)).count();
     let walls_to_change: i32 = wall_count as i32 - walls as i32;
     let mut rng = rand::rng();
-    if walls_to_change > 0 {
-        // we need to remove more walls
+    let mut walls_to_remove = walls_to_change.max(0) as usize;
+    // remove walls in rounds: a wall enclosed by other walls becomes removable
+    // once one of its neighbors is removed in an earlier round
+    while walls_to_remove > 0 {
         let mut wall_indicies: Vec<usize> = map
             .iter()
             .enumerate()
             .filter(|(_idx, free)| return !(**free)) // keep only those that are not free
             .filter(|(idx, _free)| {
-                // keep only those that touch some other free cells
-                // cells at the edge can't check over-flowing neighbor cells
+                // keep only those that touch some other free cells, so the field stays connected
+                let idx = *idx;
                 let left_edge = idx % size == 0;
                 let right_edge = idx % size == size - 1;
-                let top_edge = *idx < size;
-                let bottom_edge = *idx < size * size - size;
-                if !right_edge && map.get(idx + 1).is_some_and(|free| return *free) {
-                    return true;
-                }
-                if !left_edge && map.get(idx - 1).is_some_and(|free| return *free) {
-                    return true;
-                }
-                if !bottom_edge && map.get(idx + size).is_some_and(|free| return *free) {
-                    return true;
-                }
-                if !top_edge && map.get(idx - size).is_some_and(|free| return *free) {
-                    return true;
-                }
-                return false;
+                let top_edge = idx < size;
+                let bottom_edge = idx >= size * size - size;
+                return (!right_edge && map[idx + 1])
+                    || (!left_edge && map[idx - 1])
+                    || (!bottom_edge && map[idx + size])
+                    || (!top_edge && map[idx - size]);
             })
             .map(|(idx, _free)| return idx)
             .collect();
-        wall_indicies.shuffle(&mut rng);
-        for i in 0..walls_to_change {
-            map[wall_indicies[i as usize]] = true;
+        if wall_indicies.is_empty() {
+            return Err(String::from("maze has no free cells to grow from"));
         }
+        wall_indicies.shuffle(&mut rng);
+        wall_indicies.truncate(walls_to_remove);
+        for &idx in &wall_indicies {
+            map[idx] = true;
+        }
+        walls_to_remove -= wall_indicies.len();
     }
 
     trace!("locating free cells");
@@ -196,4 +194,69 @@ fn generate_maze(size: usize, target_wall_count: i32) -> Vec<Vec<bool>> {
     carve_path(target_wall_count, &mut grid, 1, 1, size, &mut rng);
 
     return grid;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pathfinding::is_field_accessible;
+
+    #[test]
+    fn generated_field_matches_parameters() {
+        for (size, walls, players, mushrooms) in [(5, 5, 1, 1), (10, 30, 3, 8), (20, 150, 4, 20)] {
+            for _ in 0..10 {
+                let f = generate_field(size, walls, players, mushrooms).unwrap();
+                assert_eq!(f.size, size);
+                assert_eq!(f.cells.len(), size * size);
+                assert_eq!(f.cells.iter().filter(|c| return !**c).count(), walls);
+                assert_eq!(f.players.len(), players);
+                assert_eq!(f.mushrooms.len(), mushrooms);
+            }
+        }
+    }
+
+    #[test]
+    fn generated_entities_are_on_distinct_free_cells() {
+        for _ in 0..20 {
+            let f = generate_field(10, 40, 3, 10).unwrap();
+            let all = f.players.iter().chain(&f.mushrooms).collect_vec();
+            for c in &all {
+                assert!(c.x >= 0 && c.y >= 0 && c.x < 10 && c.y < 10);
+                assert!(
+                    f.cells[(c.y * 10 + c.x) as usize],
+                    "entity on a wall at {c}"
+                );
+            }
+            assert_eq!(
+                all.iter().map(|c| return (c.x, c.y)).unique().count(),
+                all.len()
+            );
+        }
+    }
+
+    #[test]
+    fn generated_field_is_accessible() {
+        for walls in [10, 30, 45, 60] {
+            for _ in 0..10 {
+                let f = generate_field(10, walls, 2, 3).unwrap();
+                assert!(is_field_accessible(&f.cells, f.size), "walls={walls}");
+            }
+        }
+    }
+
+    #[test]
+    fn generates_field_without_walls() {
+        for size in [5, 10] {
+            for _ in 0..20 {
+                let f = generate_field(size, 0, 1, 1).unwrap();
+                assert!(f.cells.iter().all(|c| return *c));
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_impossible_configurations() {
+        assert!(generate_field(5, 26, 1, 1).is_err());
+        assert!(generate_field(5, 20, 3, 3).is_err());
+    }
 }
