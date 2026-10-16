@@ -1,5 +1,6 @@
 use std::{fmt::Display, fs, path::PathBuf};
 
+use itertools::Itertools;
 use log::*;
 use serde::{Deserialize, Serialize};
 
@@ -174,6 +175,82 @@ pub struct Field {
     /// booleans representing the cells, where true means the player can step on that cell
     /// the shape is 2D matrix stored in a single vec, row-after-row
     pub cells: Vec<bool>,
+}
+
+impl Field {
+    /// render field into pretty ascii art
+    pub fn render_pretty(&self) -> String {
+        let mut buf: Vec<Vec<char>> = Vec::with_capacity(self.size);
+        let wall = '█';
+        let path = '░';
+        let player = 'P';
+        let mush = '*';
+        let player_pos_flattened = self
+            .players
+            .iter()
+            .map(|p| return p.x + p.y * self.size as i32)
+            .collect_vec();
+        let mushrooms_pos_flattened = self
+            .mushrooms
+            .iter()
+            .map(|p| return p.x + p.y * self.size as i32)
+            .collect_vec();
+        for r in 0..self.size {
+            let mut row: Vec<char> = Vec::with_capacity(self.size);
+            for c in 0..self.size {
+                let pos = r * self.size + c;
+                let cell = self.cells[pos];
+                if cell {
+                    if player_pos_flattened.contains(&(pos as i32)) {
+                        row.push(player);
+                    } else if mushrooms_pos_flattened.contains(&(pos as i32)) {
+                        row.push(mush);
+                    } else {
+                        row.push(path);
+                    }
+                } else {
+                    row.push(wall);
+                }
+            }
+            buf.push(row);
+        }
+        return buf
+            .into_iter()
+            .map(|row| return row.into_iter().collect::<String>())
+            .collect::<Vec<String>>()
+            .join("\n");
+    }
+
+    /// render field into parsable ascii art
+    pub fn render_parsable(&self) -> String {
+        let mut buf = String::new();
+        let player_flat_idxs = self
+            .players
+            .iter()
+            .map(|c| return c.x + c.y * self.size as i32)
+            .collect_vec();
+        let mush_flat_idxs = self
+            .mushrooms
+            .iter()
+            .map(|c| return c.x + c.y * self.size as i32)
+            .collect_vec();
+        for (idx, free) in self.cells.iter().enumerate() {
+            if idx > 0 && idx % self.size == 0 {
+                buf += "\n"
+            }
+            let idx = idx as i32;
+            if !free {
+                buf += "X ";
+            } else if player_flat_idxs.contains(&idx) {
+                buf += "P ";
+            } else if mush_flat_idxs.contains(&idx) {
+                buf += "M ";
+            } else {
+                buf += "- ";
+            }
+        }
+        return buf;
+    }
 }
 
 /// General structure that represents named [X,Y] value

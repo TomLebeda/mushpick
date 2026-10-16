@@ -8,7 +8,6 @@ use generator::*;
 use itertools::Itertools;
 use log::*;
 use pathfinding::*;
-use renderer::*;
 use solver::*;
 use utils::*;
 
@@ -18,8 +17,6 @@ mod cli;
 mod generator;
 /// path-finding related functions
 mod pathfinding;
-/// functions related to rendering
-mod renderer;
 /// functions related to the solver itself
 mod solver;
 /// various utility functions and types
@@ -47,11 +44,6 @@ fn main() {
             pretty,
             save,
         } => run_generate(size, players, mushrooms, walls, pretty, save),
-        cli::Commands::Render {
-            map,
-            out_file,
-            solution,
-        } => render_tikz(map, out_file, solution),
     };
 }
 
@@ -180,7 +172,7 @@ fn run_generate(
                 }
             }
             if pretty {
-                println!("{}", field.render_pretty(None));
+                println!("{}", field.render_pretty());
             } else {
                 println!("{parsable}");
             }

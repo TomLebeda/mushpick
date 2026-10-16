@@ -96,14 +96,4 @@ pub enum Commands {
         #[arg(long)]
         save: Option<Option<String>>,
     },
-
-    /// Render input map and optionally paths as tikz code for pretty pictures
-    Render {
-        /// file where the map is stored
-        map: PathBuf,
-        /// file where the output tikz code will be saved
-        out_file: PathBuf,
-        /// file where the solution is stored
-        solution: Option<PathBuf>,
-    },
 }
