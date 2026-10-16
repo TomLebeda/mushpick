@@ -625,3 +625,143 @@ pub fn is_field_accessible(cells: &[bool], size: usize) -> bool {
 //         })
 //         .collect_vec();
 // }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::VecDeque;
+
+    use super::*;
+    use crate::generator::generate_field;
+    use crate::utils::tests::field;
+
+    /// Reference BFS distance between two coordinates, None if unreachable
+    fn ref_dist(f: &Field, from: Coord, to: Coord) -> Option<usize> {
+        let n = f.size as i32;
+        let idx = |c: Coord| return (c.y * n + c.x) as usize;
+        let mut dist = vec![usize::MAX; f.cells.len()];
+        let mut q = VecDeque::from([from]);
+        dist[idx(from)] = 0;
+        while let Some(c) = q.pop_front() {
+            if c == to {
+                return Some(dist[idx(c)]);
+            }
+            for d in Direction::get_all_dirs() {
+                let nc = d.apply_step(&c);
+                if nc.x < 0 || nc.y < 0 || nc.x >= n || nc.y >= n {
+                    continue;
+                }
+                if f.cells[idx(nc)] && dist[idx(nc)] == usize::MAX {
+                    dist[idx(nc)] = dist[idx(c)] + 1;
+                    q.push_back(nc);
+                }
+            }
+        }
+        return None;
+    }
+
+    /// Walk the path from `from` and assert it stays on free cells and ends at `to`
+    fn assert_valid_path(f: &Field, from: Coord, to: Coord, path: &[Direction]) {
+        let n = f.size as i32;
+        let mut pos = from;
+        for d in path {
+            pos = d.apply_step(&pos);
+            assert!(
+                pos.x >= 0 && pos.y >= 0 && pos.x < n && pos.y < n,
+                "left the map"
+            );
+            assert!(
+                f.cells[(pos.y * n + pos.x) as usize],
+                "walked into a wall at {pos}"
+            );
+        }
+        assert_eq!(pos, to, "path does not end at the target");
+    }
+
+    /// Check bfs_p2m and bfs_m2m against the reference BFS
+    fn check_paths(f: &Field) {
+        let p2m = bfs_p2m(f);
+        assert_eq!(p2m.len(), f.players.len());
+        for (pi, row) in p2m.iter().enumerate() {
+            assert_eq!(row.len(), f.mushrooms.len());
+            for (mi, path) in row.iter().enumerate() {
+                let (from, to) = (f.players[pi], f.mushrooms[mi]);
+                assert_eq!(Some(path.len()), ref_dist(f, from, to));
+                assert_valid_path(f, from, to, path);
+            }
+        }
+
+        let m2m = bfs_m2m(f);
+        assert_eq!(m2m.len(), f.mushrooms.len());
+        for (i, row) in m2m.iter().enumerate() {
+            assert_eq!(row.len(), f.mushrooms.len());
+            for (j, path) in row.iter().enumerate() {
+                if i == j {
+                    continue;
+                }
+                let (from, to) = (f.mushrooms[i], f.mushrooms[j]);
+                assert_eq!(Some(path.len()), ref_dist(f, from, to));
+                assert_eq!(path.len(), m2m[j][i].len(), "m2m not symmetric");
+                assert_valid_path(f, from, to, path);
+            }
+        }
+    }
+
+    #[test]
+    fn accessible_open_map() {
+        let f = field("- - -\n- - -\n- - -\n");
+        assert!(is_field_accessible(&f.cells, f.size));
+    }
+
+    #[test]
+    fn accessible_maze_with_walls() {
+        let f = field("- X -\n- X -\n- - -\n");
+        assert!(is_field_accessible(&f.cells, f.size));
+    }
+
+    #[test]
+    fn not_accessible_when_split_by_wall() {
+        let f = field("- X -\n- X -\n- X -\n");
+        assert!(!is_field_accessible(&f.cells, f.size));
+    }
+
+    #[test]
+    fn not_accessible_when_cell_enclosed() {
+        let f = field("- - - -\n- - X -\n- X - X\n- - X -\n");
+        assert!(!is_field_accessible(&f.cells, f.size));
+    }
+
+    #[test]
+    fn not_accessible_when_all_walls() {
+        let f = field("X X\nX X\n");
+        assert!(!is_field_accessible(&f.cells, f.size));
+    }
+
+    #[test]
+    fn paths_with_detour() {
+        // the player has to go around the wall to reach the mushrooms
+        let f = field("P X M -\n- X X -\n- - - -\nM X - -\n");
+        let p2m = bfs_p2m(&f);
+        assert_eq!(p2m[0][0].len(), 8);
+        assert_eq!(p2m[0][1].len(), 3);
+        check_paths(&f);
+    }
+
+    #[test]
+    fn paths_on_hand_made_maps() {
+        check_paths(&field("P M\n- -\n"));
+        check_paths(&field("P - - M\nX X - X\nM - - -\nP X X M\n"));
+        check_paths(&field(
+            "P - X - M\n- X - - X\n- - - X -\nX X - - -\nM - - X P\n",
+        ));
+    }
+
+    #[test]
+    fn paths_on_generated_maps() {
+        for size in [5, 8, 13] {
+            for _ in 0..10 {
+                let f = generate_field(size, size * size / 3, 3, 6).unwrap();
+                check_paths(&f);
+            }
+        }
+    }
+}
