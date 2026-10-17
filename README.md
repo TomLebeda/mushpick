@@ -48,9 +48,11 @@ mushpick gen -s 100 -w 3000 -p 3 -m 10
 mushpick solve maps/map_s50_p3_m15.txt > solution.txt
 ```
 
-Prints one line per player in the format `P<index>:<steps>`. `-f, --fast` skips the
-accessibility check and the exhaustive search, returning the best heuristic solution
-(not guaranteed optimal).
+Prints one line per player in the format `P<index>:<steps>`. The solution is always optimal.
+Maps with up to about 100 mushrooms usually take milliseconds to seconds; the time grows
+exponentially in the worst case, progress is logged at the `info` level.
+`-f, --fast` uses only the heuristics (milliseconds even for 1000 mushrooms, not guaranteed optimal). Fails if some mushroom
+can't be reached by any player; mushrooms reachable only by some players are fine.
 
 ### check
 
@@ -85,11 +87,21 @@ Example maps are in `maps/` (`map_s<size>_p<players>_m<mushrooms>.txt`).
 
 ## How the solver works
 
-1. BFS computes the shortest paths and distances player-to-mushroom and mushroom-to-mushroom.
-2. Two heuristics (greedy and lookahead) produce initial assignments of mushrooms to players.
-3. Each player's visiting order is optimized with a DFS branch-and-bound using MST lower bounds.
-4. Unless `--fast` is used, all assignments are then searched exhaustively, pruned by
-   MST-based lower bounds against the best cost found so far.
+1. One BFS per mushroom gives the mushroom-to-mushroom and player-to-mushroom distances
+   (unreachable pairs are infinite) and a BFS tree used to print the paths.
+2. Heuristics build an initial solution: greedy, lookahead and cheapest insertion, each
+   followed by local search (2-opt, Or-opt, moving and swapping mushrooms between players,
+   exchanging route ends). Routes of up to 10 mushrooms are ordered optimally.
+3. Unless `--fast` is used, the exact solver proves the optimum:
+   - `src/solver/search.rs`, any size: depth-first branch and bound that builds the routes
+     player by player. The lower bound is the cheapest spanning forest of the remaining
+     mushrooms rooted at the current route end and the later players, tightened by
+     Lagrangian degree penalties (Held-Karp bound). States reached again at no lower cost
+     are pruned.
+   - `src/solver/exact.rs`, up to 20 mushrooms: if the search exceeds a node budget, tables
+     over all mushroom subsets give the exact route cost of every player for every subset,
+     and branch and bound (or dynamic programming) over these tables splits the mushrooms.
+     This bounds the worst case for small maps.
 
 ## Tests
 
@@ -99,7 +111,8 @@ cargo test --no-fail-fast
 
 - Unit tests live in `#[cfg(test)]` modules inside each `src/*.rs` file.
 - `tests/cli.rs` drives the built binary end to end: generate, solve and check.
-  It compares `solve` results against a brute-force optimum on small random maps.
+  It compares `solve` results against a brute-force optimum on small random maps and
+  checks the known optimal costs of the maps in `maps/`.
 
 ## Project layout
 
@@ -107,7 +120,10 @@ cargo test --no-fail-fast
 | --- | --- |
 | `src/main.rs` | entry point, `check` and `generate` commands |
 | `src/cli.rs` | clap CLI definitions |
-| `src/solver.rs` | splitting and ordering search |
-| `src/pathfinding.rs` | BFS distance/path computation, flood fill |
+| `src/solver/mod.rs` | `solve` command, distance matrices (`Costs`) |
+| `src/solver/exact.rs` | exact solver entry, subset tables for up to 20 mushrooms |
+| `src/solver/search.rs` | exact branch and bound for any size (Held-Karp bound) |
+| `src/solver/heuristic.rs` | construction heuristics and local search |
+| `src/pathfinding.rs` | BFS distances and paths, flood fill |
 | `src/generator.rs` | random map generation |
 | `src/utils.rs` | map parsing and printing, shared types |
