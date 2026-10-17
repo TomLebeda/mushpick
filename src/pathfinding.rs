@@ -1,630 +1,258 @@
-use itertools::Itertools;
-use log::*;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::*;
 
-use crate::{Coord, Field, test_down, test_left, test_right, test_up, utils::Direction};
+use crate::{Coord, Field, solver::Costs, utils::Direction};
 
-// /// Find a shortest path using parallelized BFS algorithm
-// pub fn find_min_path(field_size: i32, cells: &[bool], start: &Coord, goal: &Coord) -> Vec<Coord> {
-//     #[derive(Debug)]
-//     struct Node {
-//         /// flattened XY coordinate of the cell
-//         coord: i32,
-//         /// index of the parent node in the previous layer/step
-//         prev_coord: Option<i32>,
-//     }
-//
-//     let mut cells = cells.to_owned();
-//     let mut layers: Vec<Vec<Node>> = vec![vec![Node {
-//         coord: start.x + field_size * start.y,
-//         prev_coord: None,
-//     }]];
-//
-//     loop {
-//         let last_layer: &Vec<Node> = layers.last().unwrap();
-//         let new_layer: Vec<Node> = last_layer
-//             .par_iter()
-//             .flat_map(|n: &Node| -> Vec<Node> {
-//                 let mut new_nodes = Vec::<Node>::with_capacity(4);
-//                 // test move RIGHT
-//                 if test_right(&cells, n.coord as usize, field_size as usize) {
-//                     new_nodes.push(Node {
-//                         coord: n.coord + 1,
-//                         prev_coord: Some(n.coord),
-//                     });
-//                 }
-//                 // test move DOWN
-//                 if test_down(&cells, n.coord as usize, field_size as usize) {
-//                     new_nodes.push(Node {
-//                         coord: n.coord + field_size,
-//                         prev_coord: Some(n.coord),
-//                     })
-//                 }
-//                 // test move LEFT
-//                 if test_left(&cells, n.coord as usize, field_size as usize) {
-//                     new_nodes.push(Node {
-//                         coord: n.coord - 1,
-//                         prev_coord: Some(n.coord),
-//                     })
-//                 }
-//                 // test move UP
-//                 if test_up(&cells, n.coord as usize, field_size as usize) {
-//                     new_nodes.push(Node {
-//                         coord: n.coord - field_size,
-//                         prev_coord: Some(n.coord),
-//                     })
-//                 }
-//                 return new_nodes;
-//             })
-//             .collect();
-//
-//         if new_layer.is_empty() {
-//             println!("can't find the mushroom");
-//             return vec![];
-//         }
-//
-//         // keep each cell only once
-//         let new_layer = new_layer
-//             .into_iter()
-//             .unique_by(|n| return n.coord)
-//             .collect_vec();
-//
-//         // check if we found the target
-//         if let Some(found_goal) = new_layer
-//             .par_iter()
-//             .find_any(|n| return n.coord == goal.x + goal.y * field_size)
-//         {
-//             let mut path: Vec<Coord> = vec![Coord {
-//                 x: found_goal.coord % field_size,
-//                 y: (found_goal.coord - (found_goal.coord % field_size)) / field_size,
-//             }];
-//             let mut prev_coord = found_goal.prev_coord.unwrap();
-//             for i in (1..layers.len()).rev() {
-//                 if let Some(prev_node) = layers[i].iter().find(|n| return n.coord == prev_coord) {
-//                     path.push(Coord {
-//                         x: prev_node.coord % field_size,
-//                         y: (prev_node.coord - (prev_node.coord % field_size)) / field_size,
-//                     });
-//                     prev_coord = prev_node.prev_coord.unwrap();
-//                 }
-//             }
-//             path.push(*start);
-//             return path.into_iter().rev().collect_vec();
-//         }
-//
-//         // mark the new layer as visited
-//         new_layer
-//             .iter()
-//             .for_each(|n| cells[n.coord as usize] = false);
-//
-//         // add the new layer onto the stack
-//         layers.push(new_layer);
-//     }
-// }
+/// Distance of an unreachable pair
+pub const INF: u32 = u32::MAX;
 
-// /// Find shortest path distance using parallelized BFS algorithm
-// pub fn find_min_path_dist(
-//     field_size: i32,
-//     cells: &[bool],
-//     start: &Coord,
-//     goal: &Coord,
-// ) -> Option<usize> {
-//     let mut cells = cells.to_owned();
-//     let mut step_count = 0;
-//     let mut last_layer = vec![start.x + field_size * start.y];
-//     loop {
-//         step_count += 1;
-//         let new_layer: Vec<i32> = last_layer
-//             .par_iter()
-//             .flat_map(|n| {
-//                 let mut new_nodes = Vec::<i32>::with_capacity(4);
-//                 // test move RIGHT
-//                 if test_right(&cells, *n as usize, field_size as usize) {
-//                     new_nodes.push(n + 1);
-//                 }
-//                 // test move DOWN
-//                 if test_down(&cells, *n as usize, field_size as usize) {
-//                     new_nodes.push(n + field_size)
-//                 }
-//                 // test move LEFT
-//                 if test_left(&cells, *n as usize, field_size as usize) {
-//                     new_nodes.push(n - 1)
-//                 }
-//                 // test move UP
-//                 if test_up(&cells, *n as usize, field_size as usize) {
-//                     new_nodes.push(n - field_size)
-//                 }
-//                 return new_nodes;
-//             })
-//             .collect();
-//         if new_layer.is_empty() {
-//             return None;
-//         }
-//         // keep each cell only once
-//         let new_layer = new_layer.into_iter().unique().collect_vec();
-//         // check if we found the target
-//         if let Some(_found_goal) = new_layer
-//             .par_iter()
-//             .find_any(|n| return **n == goal.x + goal.y * field_size)
-//         {
-//             return Some(step_count);
-//         }
-//         // mark the new layer as visited
-//         new_layer.iter().for_each(|n| cells[*n as usize] = false);
-//         // add the new layer onto the stack
-//         last_layer = new_layer;
-//     }
-// }
+// Cell codes of a BFS tree. A visited cell stores the step that leads one cell closer to the
+// BFS source, so walking the codes from any visited cell gives a shortest path to the source.
+/// free cell not visited yet
+const UNSEEN: u8 = 0;
+/// step right to get closer to the source
+const STEP_RIGHT: u8 = 1;
+/// step up to get closer to the source
+const STEP_UP: u8 = 2;
+/// step left to get closer to the source
+const STEP_LEFT: u8 = 3;
+/// step down to get closer to the source
+const STEP_DOWN: u8 = 4;
+/// the BFS source itself
+const SOURCE: u8 = 5;
+/// wall or the border around the map
+const WALL: u8 = 6;
+/// free cell holding a BFS target (a mushroom or a player), not visited yet
+const TARGET: u8 = 8;
 
-// /// Compute the distance between players (columns) and mushrooms (rows).
-// ///
-// /// Will panic if some point can't be reached (assumes all non-obstacle cells are accessible).
-// pub fn get_p2m_dist_matrix(field: &Field) -> Vec<Vec<usize>> {
-//     let player_count = field.players.len();
-//     let mush_count = field.mushrooms.len();
-//     let mut mat: Vec<Vec<usize>> = vec![vec![0; player_count]; mush_count];
-//     for p in 0..player_count {
-//         (0..mush_count).for_each(|m| {
-//             let start = field.players[p];
-//             let goal = field.mushrooms[m];
-//             let dist = match find_min_path_dist(field.size as i32, &field.cells, &start, &goal) {
-//                 Some(d) => d,
-//                 None => {
-//                     unreachable!("can't find path from {start:?} to {goal:?}");
-//                 }
-//             };
-//             mat[m][p] = dist;
-//         });
-//     }
-//     return mat;
-// }
+/// Marks a cell that is not a BFS target
+const NO_TARGET: u32 = u32::MAX;
 
-// /// Compute the distance between all mushrooms
-// ///
-// /// Will panic if some point can't be reached (assumes all non-obstacle cells are accessible).
-// pub fn get_m2m_dist_matrix(field: &Field) -> Vec<Vec<usize>> {
-//     let mush_count = field.mushrooms.len();
-//     let mut mat: Vec<Vec<usize>> = vec![vec![0; mush_count]; mush_count];
-//     for i in 0..mush_count {
-//         for j in i + 1..mush_count {
-//             let start = field.mushrooms[i];
-//             let goal = field.mushrooms[j];
-//             let dist = match find_min_path_dist(field.size as i32, &field.cells, &start, &goal) {
-//                 Some(d) => d,
-//                 None => unreachable!("can't find path from {start:?} to {goal:?}"),
-//             };
-//             mat[i][j] = dist;
-//             mat[j][i] = dist;
-//         }
-//     }
-//     return mat;
-// }
+/// Keep the BFS trees for path reconstruction only while they fit into this many bytes,
+/// otherwise rebuild them when printing the solution
+const TREE_MEMORY_BUDGET: usize = 512 << 20;
 
-/// Find player-to-mush shortest paths using BFS algorithm
-pub fn bfs_p2m(field: &Field) -> Vec<Vec<Vec<Direction>>> {
-    /// get the path from given direction matrix and ending point
-    fn get_path(dirmat: &[u8], end: usize, field_size: usize) -> Vec<Direction> {
-        let mut end2start: Vec<Direction> = vec![];
-        let mut current = end;
-
-        while dirmat[current] != 5 {
-            match dirmat[current] {
-                1 => {
-                    // move right
-                    current += 1;
-                    end2start.push(Direction::Right);
-                }
-                2 => {
-                    // move up
-                    current -= field_size;
-                    end2start.push(Direction::Up);
-                }
-                3 => {
-                    // move left
-                    current -= 1;
-                    end2start.push(Direction::Left);
-                }
-                4 => {
-                    // move down
-                    current += field_size;
-                    end2start.push(Direction::Down);
-                }
-                _ => unreachable!(),
-            }
-        }
-        // now we have path end -> start, so reverse it as well
-        let start2end = end2start
-            .iter()
-            .rev()
-            .map(|d| match d {
-                Direction::Up => return Direction::Down,
-                Direction::Down => return Direction::Up,
-                Direction::Left => return Direction::Right,
-                Direction::Right => return Direction::Left,
-            })
-            .collect();
-        return start2end;
-    }
-
-    let mush_count = field.mushrooms.len();
-
-    // final matrix with paths from player to mushroom
-    let path_matrix = field
-        .players
-        .par_iter()
-        .map(|player| -> Vec<Vec<Direction>> {
-            let origin_flattened = player.x + field.size as i32 * player.y; // flattened coordinate of the origin mushroom
-
-            // direction matrix for BFS flood-fill with backtracking
-            let mut mat: Vec<u8> = vec![0; field.size * field.size]; // flattened grid, row-major
-            // INFO: directions:
-            // 0 = not visited yet,
-            // 1 = right,
-            // 2 = up,
-            // 3 = left,
-            // 4 = down,
-            // 5 = beginning point
-
-            mat[origin_flattened as usize] = 5;
-            let mut open: Vec<usize> = vec![origin_flattened as usize]; // list of coordinates that are waiting for expansion
-
-            // prepare the paths-buffer for this player
-            let mut paths: Vec<Vec<Direction>> = vec![Vec::new(); mush_count];
-
-            while !open.is_empty() {
-                let new_open: Vec<usize> = open
-                    .iter()
-                    .flat_map(|c| {
-                        let mut inner_buf: Vec<usize> = Vec::with_capacity(4);
-                        // check above
-                        if *c >= field.size {
-                            let above = c - field.size;
-                            if mat[above] == 0 && field.cells[above] {
-                                mat[above] = 4; // 4 means "move down" (for backtracking)
-                                inner_buf.push(above);
-                            }
-                        }
-                        // check below
-                        if *c < field.size * field.size - field.size {
-                            let below = c + field.size;
-                            if mat[below] == 0 && field.cells[below] {
-                                mat[below] = 2; // 2 mean "move up" (for backtracking)
-                                inner_buf.push(below);
-                            }
-                        }
-                        // check right
-                        if c % field.size != field.size - 1 {
-                            let right = c + 1;
-                            if mat[right] == 0 && field.cells[right] {
-                                mat[right] = 3; // 3 means "move left" (for backtracking)
-                                inner_buf.push(right)
-                            }
-                        }
-                        // check left
-                        if c % field.size != 0 {
-                            let left = c - 1;
-                            if mat[left] == 0 && field.cells[left] {
-                                mat[left] = 1; // 1 means "move right" (for backtracking)
-                                inner_buf.push(left)
-                            }
-                        }
-                        return inner_buf;
-                    })
-                    .sorted_unstable()
-                    .dedup()
-                    .collect();
-
-                // check if there are mushrooms left to find
-                for (mush_idx, mush_coord) in field.mushrooms.iter().enumerate() {
-                    let mush_coord_flattened =
-                        mush_coord.x as usize + mush_coord.y as usize * field.size;
-                    if new_open.contains(&mush_coord_flattened) {
-                        // we found a mushroom in the last iteration
-                        let path = get_path(&mat, mush_coord_flattened, field.size);
-                        paths[mush_idx] = path;
-                        // path_matrix[origin_mush_idx][*mush_idx] = path;
-                    }
-                }
-
-                // check for early stopping
-                if paths.iter().any(|p| return p.is_empty()) {
-                    open = new_open;
-                } else {
-                    // all mushrooms were found already => skip the rest
-                    open = vec![];
-                }
-            }
-            return paths;
-        })
-        .collect();
-    return path_matrix;
+/// Map surrounded by a one-cell wall border, so neighbors never need bounds checks
+struct Grid {
+    /// width (and height) including the border
+    width: usize,
+    /// row-major cells: `UNSEEN` or `TARGET` for free cells, `WALL` otherwise
+    cells: Vec<u8>,
 }
 
-/// Find mush-to-mush shortest paths using BFS algorithm
-pub fn bfs_m2m(field: &Field) -> Vec<Vec<Vec<Direction>>> {
-    let mush_count = field.mushrooms.len();
-
-    fn get_paths(dirmat: &[u8], end: usize, field_size: usize) -> (Vec<Direction>, Vec<Direction>) {
-        let mut end2start: Vec<Direction> = vec![];
-        let mut current = end;
-
-        while dirmat[current] != 5 {
-            match dirmat[current] {
-                1 => {
-                    // move right
-                    current += 1;
-                    end2start.push(Direction::Right);
+impl Grid {
+    fn new(cells: &[bool], size: usize) -> Grid {
+        let width = size + 2;
+        let mut padded = vec![WALL; width * width];
+        for y in 0..size {
+            for x in 0..size {
+                if cells[y * size + x] {
+                    padded[(y + 1) * width + x + 1] = UNSEEN;
                 }
-                2 => {
-                    // move up
-                    current -= field_size;
-                    end2start.push(Direction::Up);
-                }
-                3 => {
-                    // move left
-                    current -= 1;
-                    end2start.push(Direction::Left);
-                }
-                4 => {
-                    // move down
-                    current += field_size;
-                    end2start.push(Direction::Down);
-                }
-                _ => unreachable!(),
             }
         }
-        // now we have path end -> start, so reverse it as well
-        let start2end = end2start
-            .iter()
-            .rev()
-            .map(|d| match d {
-                Direction::Up => return Direction::Down,
-                Direction::Down => return Direction::Up,
-                Direction::Left => return Direction::Right,
-                Direction::Right => return Direction::Left,
+        return Grid {
+            width,
+            cells: padded,
+        };
+    }
+
+    /// flat index of a map coordinate
+    fn index(&self, c: &Coord) -> usize {
+        return (c.y as usize + 1) * self.width + c.x as usize + 1;
+    }
+
+    /// Run BFS from `source`, returning the BFS tree and the number of visited cells.
+    ///
+    /// `target_slot` maps `TARGET` cells to indices into `dist`, which receives the distances of
+    /// the reached targets. The search stops early once all `dist.len()` targets are reached
+    /// (never when there are no targets, so it can be used as a flood fill).
+    fn bfs(
+        &self,
+        source: usize,
+        target_slot: &[u32],
+        dist: &mut [u32],
+        queue: &mut Vec<u32>,
+    ) -> (Vec<u8>, usize) {
+        let w = self.width;
+        let mut tree = self.cells.clone();
+        tree[source] = SOURCE;
+        // every cell enters the queue at most once
+        if queue.len() < tree.len() {
+            queue.resize(tree.len(), 0);
+        }
+        queue[0] = source as u32;
+
+        let n_targets = dist.len();
+        let mut found = 0;
+        let mut reach = |cell: usize, d: u32, found: &mut usize| {
+            let slot = target_slot[cell];
+            if slot != NO_TARGET {
+                dist[slot as usize] = d;
+                *found += 1;
+            }
+        };
+        if self.cells[source] == TARGET {
+            reach(source, 0, &mut found);
+        }
+
+        let (mut head, mut tail, mut level_end, mut d) = (0, 1, 1, 0);
+        while head < tail && (found < n_targets || n_targets == 0) {
+            if head == level_end {
+                d += 1;
+                level_end = tail;
+            }
+            let cell = queue[head] as usize;
+            head += 1;
+            // neighbor and the step from the neighbor back to `cell`
+            for (next, step) in [
+                (cell + 1, STEP_LEFT),
+                (cell - 1, STEP_RIGHT),
+                (cell + w, STEP_UP),
+                (cell - w, STEP_DOWN),
+            ] {
+                let code = tree[next];
+                // branchless on purpose: walls are random, so a branch here mispredicts a lot
+                let open = code & !TARGET == 0; // UNSEEN or TARGET
+                tree[next] = if open { step } else { code };
+                queue[tail] = next as u32;
+                tail += open as usize;
+                if code == TARGET {
+                    reach(next, d + 1, &mut found);
+                }
+            }
+        }
+        return (tree, tail);
+    }
+
+    /// Steps from `from` to the source of `tree`, along the tree
+    fn path_to_source(&self, tree: &[u8], from: usize) -> Vec<Direction> {
+        let mut path = vec![];
+        let mut cell = from;
+        loop {
+            let step = match tree[cell] {
+                STEP_RIGHT => Direction::Right,
+                STEP_UP => Direction::Up,
+                STEP_LEFT => Direction::Left,
+                STEP_DOWN => Direction::Down,
+                SOURCE => return path,
+                _ => unreachable!("cell {cell} is not in the BFS tree"),
+            };
+            cell = match step {
+                Direction::Right => cell + 1,
+                Direction::Up => cell - self.width,
+                Direction::Left => cell - 1,
+                Direction::Down => cell + self.width,
+            };
+            path.push(step);
+        }
+    }
+}
+
+/// Shortest distances between players and mushrooms, with the paths behind them
+pub struct Distances {
+    /// distance matrices used by the solver
+    pub costs: Costs,
+    /// padded map
+    grid: Grid,
+    /// grid index of each player
+    player_cells: Vec<usize>,
+    /// grid index of each mushroom
+    mushroom_cells: Vec<usize>,
+    /// BFS tree of each mushroom, `None` when they did not fit into memory
+    trees: Option<Vec<Vec<u8>>>,
+}
+
+impl Distances {
+    /// Run one BFS from every mushroom, reaching all mushrooms and players
+    pub fn build(field: &Field) -> Distances {
+        let grid = Grid::new(&field.cells, field.size);
+        let player_cells: Vec<usize> = field.players.iter().map(|c| return grid.index(c)).collect();
+        let mushroom_cells: Vec<usize> =
+            field.mushrooms.iter().map(|c| return grid.index(c)).collect();
+        let (n, p) = (mushroom_cells.len(), player_cells.len());
+
+        // targets: mushrooms first, then players
+        let mut grid = grid;
+        let mut target_slot = vec![NO_TARGET; grid.cells.len()];
+        for (slot, &cell) in mushroom_cells.iter().chain(&player_cells).enumerate() {
+            target_slot[cell] = slot as u32;
+            grid.cells[cell] = TARGET;
+        }
+
+        let keep_trees = n.saturating_mul(grid.cells.len()) <= TREE_MEMORY_BUDGET;
+        let results: Vec<(Vec<u32>, Option<Vec<u8>>)> = mushroom_cells
+            .par_iter()
+            .map_init(Vec::new, |queue, &cell| {
+                let mut dist = vec![INF; n + p];
+                let (tree, _) = grid.bfs(cell, &target_slot, &mut dist, queue);
+                return (dist, keep_trees.then_some(tree));
             })
             .collect();
-        return (start2end, end2start);
+
+        let mut m2m = vec![INF; n * n];
+        let mut p2m = vec![INF; p * n];
+        let mut trees = keep_trees.then(Vec::new);
+        for (i, (dist, tree)) in results.into_iter().enumerate() {
+            m2m[i * n..(i + 1) * n].copy_from_slice(&dist[..n]);
+            for pi in 0..p {
+                p2m[pi * n + i] = dist[n + pi];
+            }
+            if let (Some(trees), Some(tree)) = (&mut trees, tree) {
+                trees.push(tree);
+            }
+        }
+
+        return Distances {
+            costs: Costs { n, p, m2m, p2m },
+            grid,
+            player_cells,
+            mushroom_cells,
+            trees,
+        };
     }
 
-    // final matrix with paths from mushroom to mushroom
-    let mut path_matrix: Vec<Vec<Vec<Direction>>> = vec![vec![Vec::new(); mush_count]; mush_count];
-
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..mush_count {
-        // on the diagonal, fill up the paths with some dummy paths to avoid confusing the fill-checks
-        path_matrix[i][i] = vec![Direction::Right];
-    }
-
-    for target_row_idx in 0..mush_count {
-        let origin_mush = field.mushrooms[target_row_idx]; // the starting mushroom
-        let origin_mush_idx = target_row_idx; // the starting mushroom index
-        let origin_flattened = origin_mush.x + field.size as i32 * origin_mush.y; // flattened coordinate of the origin mushroom
-
-        let target_mushrooms: Vec<(usize, &Coord)> = field
-            .mushrooms
-            .iter()
+    /// Steps of each player walking its route (mushroom indices in visiting order)
+    pub fn paths(&self, routes: &[Vec<usize>]) -> Vec<Vec<Direction>> {
+        return routes
+            .par_iter()
             .enumerate()
-            .filter(|(mush_idx, _c)| {
-                // drop the origin mushroom
-                return *mush_idx != target_row_idx;
-            })
-            .filter(|(mush_idx, _c)| {
-                // drop mushrooms that are fully mapped
-                let has_some_empty = path_matrix[*mush_idx].iter().any(|p| return p.is_empty());
-                return has_some_empty;
+            .map_init(Vec::new, |queue, (pi, route)| {
+                let mut path = vec![];
+                let mut from = self.player_cells[pi];
+                for &m in route {
+                    // the tree of the destination mushroom leads from any cell to it
+                    let tree = match &self.trees {
+                        Some(trees) => std::borrow::Cow::Borrowed(&trees[m]),
+                        None => {
+                            let slot = vec![NO_TARGET; self.grid.cells.len()];
+                            let (tree, _) = self.grid.bfs(self.mushroom_cells[m], &slot, &mut [], queue);
+                            std::borrow::Cow::Owned(tree)
+                        }
+                    };
+                    path.extend(self.grid.path_to_source(&tree, from));
+                    from = self.mushroom_cells[m];
+                }
+                return path;
             })
             .collect();
-        if target_mushrooms.is_empty() {
-            break;
-        }
-
-        let mut mat: Vec<u8> = vec![0; field.size * field.size]; // flattened grid, row-major
-        // INFO: directions:
-        // 0 = not visited yet,
-        // 1 = right,
-        // 2 = up,
-        // 3 = left,
-        // 4 = down,
-        // 5 = beginning point
-
-        mat[origin_flattened as usize] = 5;
-        let mut open: Vec<usize> = vec![origin_flattened as usize]; // list of coordinates that are waiting for expansion
-
-        while !open.is_empty() {
-            let new_open: Vec<usize> = open
-                .iter()
-                .flat_map(|c| {
-                    let mut inner_buf: Vec<usize> = Vec::with_capacity(4);
-                    // check above
-                    if *c >= field.size {
-                        let above = c - field.size;
-                        if mat[above] == 0 && field.cells[above] {
-                            mat[above] = 4; // 4 means "move down" (for backtracking)
-                            inner_buf.push(above);
-                        }
-                    }
-                    // check below
-                    if *c < field.size * field.size - field.size {
-                        let below = c + field.size;
-                        if mat[below] == 0 && field.cells[below] {
-                            mat[below] = 2; // 2 mean "move up" (for backtracking)
-                            inner_buf.push(below);
-                        }
-                    }
-                    // check right
-                    if c % field.size != field.size - 1 {
-                        let right = c + 1;
-                        if mat[right] == 0 && field.cells[right] {
-                            mat[right] = 3; // 3 means "move left" (for backtracking)
-                            inner_buf.push(right)
-                        }
-                    }
-                    // check left
-                    if c % field.size != 0 {
-                        let left = c - 1;
-                        if mat[left] == 0 && field.cells[left] {
-                            mat[left] = 1; // 1 means "move right" (for backtracking)
-                            inner_buf.push(left)
-                        }
-                    }
-
-                    return inner_buf;
-                })
-                .sorted_unstable()
-                .dedup()
-                .collect();
-
-            // check if there are mushrooms left to find
-            for (idx, coord) in &target_mushrooms {
-                let flattened = coord.x as usize + coord.y as usize * field.size;
-                if new_open.contains(&flattened) {
-                    // we found a target mushroom in the last iteration
-                    let (path, reverse_path) = get_paths(&mat, flattened, field.size);
-                    path_matrix[origin_mush_idx][*idx] = path;
-
-                    // and fill the reverse path as well
-                    path_matrix[*idx][origin_mush_idx] = reverse_path;
-                }
-            }
-
-            // check for early stopping
-            if path_matrix[target_row_idx]
-                .iter()
-                .any(|p| return p.is_empty())
-            {
-                open = new_open;
-            } else {
-                // all other mushrooms were found already => skip the rest
-                open = vec![];
-            }
-        }
     }
-
-    return path_matrix;
 }
 
-/// Run flood-fill algorithm to check if all cells are accessible
+/// Run flood fill to check if all free cells are accessible
 pub fn is_field_accessible(cells: &[bool], size: usize) -> bool {
-    let mut cells: Vec<bool> = cells.into();
-    let field_size: usize = size;
-    let Some(start) = cells.iter().position(|x| return *x) else {
-        warn!("the whole field is made out of obstacles");
+    let Some(start) = cells.iter().position(|free| return *free) else {
+        log::warn!("the whole field is made out of obstacles");
         return false;
     };
-    let mut last_layer: Vec<usize> = vec![start];
-    loop {
-        if last_layer.is_empty() {
-            // if all cells are 'false', then all cells have been accessed (or obstacles)
-            return cells.iter().all(|b| return !b);
-        }
-        let new_layer: Vec<usize> = last_layer
-            .par_iter()
-            .flat_map(|n: &usize| -> Vec<usize> {
-                let mut new_nodes = Vec::<usize>::with_capacity(4);
-                // test move RIGHT
-                if test_right(&cells, *n, field_size) {
-                    new_nodes.push(n + 1);
-                }
-                // test move DOWN
-                if test_down(&cells, *n, field_size) {
-                    new_nodes.push(n + field_size)
-                }
-                // test move LEFT
-                if test_left(&cells, *n, field_size) {
-                    new_nodes.push(n - 1)
-                }
-                // test move UP
-                if test_up(&cells, *n, field_size) {
-                    new_nodes.push(n - field_size)
-                }
-                return new_nodes;
-            })
-            .collect();
-        // keep each cell only once
-        let new_layer = new_layer.into_iter().unique().collect_vec();
-        // mark the new layer as visited
-        new_layer.iter().for_each(|n| cells[*n] = false);
-        // add the new layer onto the stack
-        last_layer = new_layer;
-    }
+    let grid = Grid::new(cells, size);
+    let start = grid.index(&Coord {
+        x: (start % size) as i32,
+        y: (start / size) as i32,
+    });
+    let slot = vec![NO_TARGET; grid.cells.len()];
+    let (_, visited) = grid.bfs(start, &slot, &mut [], &mut Vec::new());
+    return visited == cells.iter().filter(|free| return **free).count();
 }
-
-// /// Returns a flat vector of distances (row-major order).
-// /// -1 means unreachable.
-// pub fn bfs_distances(size: usize, cells: &[bool], start: Coord) -> Vec<i32> {
-//     let n = size * size;
-//     let mut dist: Vec<i32> = vec![-1; n];
-//
-//     let start_idx = start.y as usize * size + start.x as usize;
-//     dist[start_idx] = 0;
-//
-//     let mut q: VecDeque<usize> = VecDeque::with_capacity(n);
-//
-//     q.push_back(start_idx);
-//
-//     while let Some(idx) = q.pop_front() {
-//         let d = dist[idx];
-//         let x = idx % size;
-//         let y = idx / size;
-//
-//         // 4-neighborhood
-//         if x + 1 < size {
-//             let n_idx = y * size + (x + 1);
-//             if cells[n_idx] && dist[n_idx] == -1 {
-//                 dist[n_idx] = d + 1;
-//                 q.push_back(n_idx);
-//             }
-//         }
-//         if x > 0 {
-//             let n_idx = y * size + (x - 1);
-//             if cells[n_idx] && dist[n_idx] == -1 {
-//                 dist[n_idx] = d + 1;
-//                 q.push_back(n_idx);
-//             }
-//         }
-//         if y + 1 < size {
-//             let n_idx = (y + 1) * size + x;
-//             if cells[n_idx] && dist[n_idx] == -1 {
-//                 dist[n_idx] = d + 1;
-//                 q.push_back(n_idx);
-//             }
-//         }
-//         if y > 0 {
-//             let n_idx = (y - 1) * size + x;
-//             if cells[n_idx] && dist[n_idx] == -1 {
-//                 dist[n_idx] = d + 1;
-//                 q.push_back(n_idx);
-//             }
-//         }
-//     }
-//
-//     return dist;
-// }
-
-// /// Find the paths for given split for each player.
-// /// Return a vector of coordinate sequences for each player
-// pub fn pathfind_split(split: &[(Vec<usize>, usize)], field: &Field) -> Vec<Vec<Coord>> {
-//     return split
-//         .iter()
-//         .enumerate()
-//         .map(|(player_idx, (mushrooms, _cost))| -> Vec<Coord> {
-//             let player_coord = &field.players[player_idx];
-//             let checkpoints = std::iter::once(*player_coord).chain(
-//                 mushrooms
-//                     .iter()
-//                     .map(|m| return &field.mushrooms[*m])
-//                     .cloned(),
-//             );
-//             let path = checkpoints
-//                 .tuple_windows()
-//                 .flat_map(|(a, b)| return find_min_path(field.size as i32, &field.cells, &a, &b))
-//                 .dedup() // remove consecutive same coordinates
-//                 .collect_vec();
-//             return path;
-//         })
-//         .collect_vec();
-// }
 
 #[cfg(test)]
 mod tests {
@@ -677,32 +305,34 @@ mod tests {
         assert_eq!(pos, to, "path does not end at the target");
     }
 
-    /// Check bfs_p2m and bfs_m2m against the reference BFS
-    fn check_paths(f: &Field) {
-        let p2m = bfs_p2m(f);
-        assert_eq!(p2m.len(), f.players.len());
-        for (pi, row) in p2m.iter().enumerate() {
-            assert_eq!(row.len(), f.mushrooms.len());
-            for (mi, path) in row.iter().enumerate() {
-                let (from, to) = (f.players[pi], f.mushrooms[mi]);
-                assert_eq!(Some(path.len()), ref_dist(f, from, to));
-                assert_valid_path(f, from, to, path);
+    /// Distance as stored in the matrices, None if unreachable
+    fn stored(d: u32) -> Option<usize> {
+        return (d != INF).then_some(d as usize);
+    }
+
+    /// Check the distance matrices and the rebuilt paths against the reference BFS
+    fn check_distances(f: &Field) {
+        let dist = Distances::build(f);
+        let c = &dist.costs;
+        assert_eq!((c.n, c.p), (f.mushrooms.len(), f.players.len()));
+        for (i, &mi) in f.mushrooms.iter().enumerate() {
+            for (j, &mj) in f.mushrooms.iter().enumerate() {
+                assert_eq!(stored(c.d(i, j)), ref_dist(f, mi, mj), "m2m {i}->{j}");
+            }
+            for (pi, &p) in f.players.iter().enumerate() {
+                assert_eq!(stored(c.s(pi, i)), ref_dist(f, p, mi), "p2m {pi}->{i}");
             }
         }
 
-        let m2m = bfs_m2m(f);
-        assert_eq!(m2m.len(), f.mushrooms.len());
-        for (i, row) in m2m.iter().enumerate() {
-            assert_eq!(row.len(), f.mushrooms.len());
-            for (j, path) in row.iter().enumerate() {
-                if i == j {
-                    continue;
-                }
-                let (from, to) = (f.mushrooms[i], f.mushrooms[j]);
-                assert_eq!(Some(path.len()), ref_dist(f, from, to));
-                assert_eq!(path.len(), m2m[j][i].len(), "m2m not symmetric");
-                assert_valid_path(f, from, to, path);
-            }
+        // every player walks to every reachable mushroom, then on to the next one
+        for pi in 0..c.p {
+            let reachable: Vec<usize> = (0..c.n).filter(|&i| return c.s(pi, i) != INF).collect();
+            let mut routes = vec![vec![]; c.p];
+            routes[pi] = reachable.clone();
+            let path = &dist.paths(&routes)[pi];
+            assert_eq!(path.len() as u32, c.route_cost(pi, &reachable));
+            let end = reachable.last().map_or(f.players[pi], |&m| return f.mushrooms[m]);
+            assert_valid_path(f, f.players[pi], end, path);
         }
     }
 
@@ -737,30 +367,42 @@ mod tests {
     }
 
     #[test]
-    fn paths_with_detour() {
+    fn distances_with_detour() {
         // the player has to go around the wall to reach the mushrooms
         let f = field("P X M -\n- X X -\n- - - -\nM X - -\n");
-        let p2m = bfs_p2m(&f);
-        assert_eq!(p2m[0][0].len(), 8);
-        assert_eq!(p2m[0][1].len(), 3);
-        check_paths(&f);
+        let c = Distances::build(&f).costs;
+        assert_eq!(c.s(0, 0), 8);
+        assert_eq!(c.s(0, 1), 3);
+        check_distances(&f);
     }
 
     #[test]
-    fn paths_on_hand_made_maps() {
-        check_paths(&field("P M\n- -\n"));
-        check_paths(&field("P - - M\nX X - X\nM - - -\nP X X M\n"));
-        check_paths(&field(
+    fn distances_on_hand_made_maps() {
+        check_distances(&field("P M\n- -\n"));
+        check_distances(&field("P - - M\nX X - X\nM - - -\nP X X M\n"));
+        check_distances(&field(
             "P - X - M\n- X - - X\n- - - X -\nX X - - -\nM - - X P\n",
         ));
     }
 
     #[test]
-    fn paths_on_generated_maps() {
+    fn unreachable_pairs_are_inf() {
+        // the right column is cut off by walls
+        let f = field("P X M\nM X -\n- X P\n");
+        let c = Distances::build(&f).costs;
+        assert_eq!(c.s(0, 1), 1);
+        assert_eq!(c.s(0, 0), INF);
+        assert_eq!(c.d(0, 1), INF);
+        assert_eq!(c.s(1, 0), 2);
+        check_distances(&f);
+    }
+
+    #[test]
+    fn distances_on_generated_maps() {
         for size in [5, 8, 13] {
             for _ in 0..10 {
                 let f = generate_field(size, size * size / 3, 3, 6).unwrap();
-                check_paths(&f);
+                check_distances(&f);
             }
         }
     }

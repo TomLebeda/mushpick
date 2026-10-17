@@ -2,9 +2,8 @@ use std::{fmt::Display, fs, path::PathBuf};
 
 use itertools::Itertools;
 use log::*;
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::missing_docs_in_private_items)]
 /// One of the 4 cardinal directions
 pub enum Direction {
@@ -90,26 +89,6 @@ impl Direction {
     }
 }
 
-/// returns true if the cell on LEFT exists and is available (free, true), otherwise returns false
-pub fn test_left(cells: &[bool], pos: usize, size: usize) -> bool {
-    return pos % size != 0 && cells[pos - 1];
-}
-
-/// returns true if the cell on RIGHT exists and is available (free, true), otherwise returns false
-pub fn test_right(cells: &[bool], pos: usize, size: usize) -> bool {
-    return ((pos + 1) % size != 0) && cells[pos + 1];
-}
-
-/// returns true if the cell DOWN exists and is available (free, true), otherwise returns false
-pub fn test_down(cells: &[bool], pos: usize, size: usize) -> bool {
-    return pos < size * size - size && cells[pos + size];
-}
-
-/// returns true if the cell UP exists and is available (free, true), otherwise returns false
-pub fn test_up(cells: &[bool], pos: usize, size: usize) -> bool {
-    return pos >= size && cells[pos - size];
-}
-
 /// Loads a Field from given file
 pub fn parse_field(path: &PathBuf) -> Field {
     let Ok(contents) = fs::read_to_string(path) else {
@@ -124,37 +103,34 @@ pub fn parse_field_str(contents: &str) -> Field {
     let size = contents.lines().count();
     let mut mushrooms: Vec<Coord> = vec![];
     let mut players: Vec<Coord> = vec![];
-    let mut cells: Vec<bool> = vec![];
-    contents.lines().enumerate().for_each(|(y, line)| {
-        let y = y as i32;
-        let line = line.replace(" ", "");
-        let line_len = line.chars().count();
-        if line_len != size {
-            error!(
-                "inconsistent size (map has {size} lines, but line {y} has {line_len} characters, expected {size})"
-            );
-            std::process::exit(exitcode::DATAERR);
-        };
-        line.chars().enumerate().for_each(|(x, c)| {
-            let x = x as i32;
+    let mut cells: Vec<bool> = Vec::with_capacity(size * size);
+    for (y, line) in contents.lines().enumerate() {
+        let row_start = cells.len();
+        for c in line.chars().filter(|&c| return c != ' ') {
+            let pos = Coord {
+                x: (cells.len() - row_start) as i32,
+                y: y as i32,
+            };
             match c {
-                'M' => {
-                    mushrooms.push(Coord { x, y });
-                    cells.push(true) // mushroom is not obstacle
-                }
-                'P' => {
-                    players.push(Coord { x, y });
-                    cells.push(true) // player is not obstacle
-                }
-                'X' => cells.push(false),
-                '-' => cells.push(true),
+                'M' => mushrooms.push(pos),
+                'P' => players.push(pos),
+                'X' | '-' => {}
                 _ => {
                     error!("encountered unrecognized character: '{c}'");
                     std::process::exit(exitcode::DATAERR);
                 }
             }
-        });
-    });
+            // mushrooms and players are not obstacles
+            cells.push(c != 'X');
+        }
+        let line_len = cells.len() - row_start;
+        if line_len != size {
+            error!(
+                "inconsistent size (map has {size} lines, but line {y} has {line_len} characters, expected {size})"
+            );
+            std::process::exit(exitcode::DATAERR);
+        }
+    }
     return Field {
         size,
         mushrooms,
@@ -254,7 +230,7 @@ impl Field {
 }
 
 /// General structure that represents named [X,Y] value
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Coord {
     /// X-coordinate
     pub x: i32,
@@ -303,36 +279,6 @@ pub(crate) mod tests {
         assert_eq!(Direction::Down.apply_step(&c), Coord { x: 2, y: 3 });
         assert_eq!(Direction::Left.apply_step(&c), Coord { x: 1, y: 2 });
         assert_eq!(Direction::Right.apply_step(&c), Coord { x: 3, y: 2 });
-    }
-
-    #[test]
-    fn neighbor_tests_respect_edges_and_walls() {
-        // - X -
-        // - - -
-        // X - -
-        let f = field("- X -\n- - -\nX - -\n");
-        let (c, n) = (&f.cells, f.size);
-        // top-left corner
-        assert!(!test_left(c, 0, n));
-        assert!(!test_up(c, 0, n));
-        assert!(!test_right(c, 0, n)); // wall
-        assert!(test_down(c, 0, n));
-        // centre
-        assert!(test_left(c, 4, n));
-        assert!(test_right(c, 4, n));
-        assert!(!test_up(c, 4, n)); // wall
-        assert!(test_down(c, 4, n));
-        // right edge must not wrap to the next row
-        assert!(!test_right(c, 5, n));
-        // left edge must not wrap to the previous row
-        assert!(!test_left(c, 3, n));
-        // bottom-right corner
-        assert!(!test_down(c, 8, n));
-        assert!(!test_right(c, 8, n));
-        assert!(test_up(c, 8, n));
-        assert!(test_left(c, 8, n));
-        // left of 7 is a wall
-        assert!(!test_left(c, 7, n));
     }
 
     #[test]

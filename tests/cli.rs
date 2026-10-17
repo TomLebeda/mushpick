@@ -262,7 +262,7 @@ fn solve_repo_map_passes_check() {
 #[test]
 fn generated_maps_are_solved_optimally() {
     for (size, walls, players, mushrooms) in
-        [(6, 10, 1, 5), (8, 20, 2, 6), (8, 20, 3, 7), (10, 35, 3, 8)]
+        [(6, 10, 1, 5), (8, 20, 2, 6), (8, 20, 3, 7), (10, 35, 3, 8), (10, 35, 5, 7)]
     {
         for _ in 0..5 {
             let text = generate(size, walls, players, mushrooms);
@@ -286,6 +286,78 @@ fn generated_maps_are_solved_optimally() {
             );
             assert!(total_steps(&fast) >= optimum);
         }
+    }
+}
+
+#[test]
+fn repo_maps_have_known_optimal_costs() {
+    for (name, steps) in [
+        ("map_s100_p3_m5", 691),
+        ("map_s100_p3_m6", 616),
+        ("map_s100_p3_m7", 414),
+        ("map_s100_p3_m8", 599),
+        ("map_s100_p3_m9", 802),
+        ("map_s100_p3_m10", 923),
+        ("map_s100_p3_m11", 617),
+        ("map_s100_p3_m12", 1064),
+        ("map_s100_p3_m13", 1198),
+        ("map_s100_p3_m14", 1205),
+        ("map_s100_p3_m15", 1094),
+        ("map_s100_p3_m16", 1288),
+        ("map_s100_p3_m17", 1412),
+        ("map_s100_p3_m18", 1123),
+        ("map_s100_p3_m19", 706),
+        ("map_s100_p3_m20", 1269),
+        ("map_s50_p3_m15", 597),
+    ] {
+        let map = PathBuf::from(repo_map(&format!("{name}.txt")));
+        let solution = solve(&map, false);
+        assert!(check(&map, &solution).contains("solution passed: true"), "{name}");
+        assert_eq!(total_steps(&solution), steps, "{name}");
+    }
+}
+
+#[test]
+fn solve_map_split_by_walls() {
+    // each player can reach only the mushrooms on its side
+    let map = temp_file("P - X M\nM - X -\n- - X -\n- - X P\n");
+    let solution = solve(&map, false);
+    assert!(check(&map, &solution).contains("solution passed: true"));
+    assert_eq!(total_steps(&solution), 1 + 3);
+}
+
+#[test]
+fn solve_fails_on_unreachable_mushroom() {
+    let map = temp_file("P - X M\n- - X -\n- - X -\n- - X -\n");
+    for fast in [false, true] {
+        let mut args = vec!["solve", map.to_str().unwrap()];
+        if fast {
+            args.push("--fast");
+        }
+        let out = run(&args);
+        assert!(!out.status.success());
+        assert!(stdout(&out).is_empty());
+    }
+}
+
+#[test]
+fn solve_large_map_with_heuristics() {
+    let text = generate(60, 1200, 10, 150);
+    let map = temp_file(&text);
+    let solution = solve(&map, true);
+    assert_eq!(solution.lines().count(), 10);
+    assert!(check(&map, &solution).contains("solution passed: true"));
+}
+
+#[test]
+fn solve_exactly_beyond_subset_tables() {
+    for _ in 0..3 {
+        let text = generate(40, 500, 3, 35);
+        let map = temp_file(&text);
+        let exact = solve(&map, false);
+        assert!(check(&map, &exact).contains("solution passed: true"));
+        let fast = solve(&map, true);
+        assert!(total_steps(&exact) <= total_steps(&fast));
     }
 }
 

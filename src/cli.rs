@@ -58,13 +58,15 @@ pub enum Commands {
     /// Solve the provided map
     ///
     /// This command will attempt to parse the file and find the best solution.
+    /// The solution is always optimal; on large maps (many mushrooms) this may take long.
+    /// Fails if some mushroom can't be reached by any player.
     /// The solution will be printed into stdout in the format `P<player-index>:<steps>`
     /// where steps is string made out of "l" "r" "u" "d" for 4-direction steps.
     /// One player-steps per output line
     Solve {
         /// Path to the map file
         map_file: PathBuf,
-        /// skip the checks and solve as fast as possible, not guaranteed to find best solution
+        /// use only the heuristics, faster but not guaranteed to find the best solution
         #[arg(long, short)]
         fast: bool,
     },

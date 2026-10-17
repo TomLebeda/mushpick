@@ -60,7 +60,7 @@ fn run_check(map_file: PathBuf, solution_file: Option<PathBuf>) {
     if let Some(solution_file) = solution_file {
         trace!("checking solution");
         let Ok(contents) = std::fs::read_to_string(&solution_file) else {
-            error!("Failed to read file {}", &solution_file.display());
+            error!("Failed to read file {}", solution_file.display());
             std::process::exit(exitcode::IOERR);
         };
 
@@ -166,7 +166,7 @@ fn run_generate(
                 match std::fs::write(&save_file, &parsable) {
                     Err(e) => {
                         error!("can't write the output file {save_file}, err: {e}");
-                        info!("here is the content, so you don't loose it:\n{}", &parsable);
+                        info!("here is the content, so you don't loose it:\n{}", parsable);
                     }
                     Ok(_) => info!("output written into {save_file}"),
                 }
